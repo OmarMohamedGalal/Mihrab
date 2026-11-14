@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Mihrab</string>
+    <string name="widget_description">Next Islamic prayer time, live countdown, and prayer emblem</string>
+    <string name="widget_next_prayer_label">Next Prayer</string>
+    <string name="widget_quran_verse_label">Daily Quran Verse</string>
+    <string name="widget_quran_verse_desc">Daily Quranic ayah — tap the widget to switch to another verse</string>
+    <string name="widget_hijri_date_label">Hijri Date</string>
+    <string name="widget_hijri_date_desc">Islamic Hijri &amp; Gregorian date badge — tap to open calendar</string>
+    <string name="widget_qibla_circle_label">Qibla Circle</string>
+    <string name="widget_qibla_circle_desc">Expressive Qibla direction circle — tap for live compass</string>
+    <string name="widget_timetable_label">Prayer Timetable</string>
+    <string name="widget_timetable_desc">Today\'s 5 daily prayer times — reshapes to any size</string>
+    <string name="widget_quran_listen_label">Quran Listen</string>
+    <string name="widget_quran_listen_desc">Expressive Quran audio disc widget — tap center to open Surah player or tap button to pause/stop</string>
+</resources>

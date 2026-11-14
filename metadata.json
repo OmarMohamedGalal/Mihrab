@@ -1,0 +1,6 @@
+{
+  "name": "Mihrab",
+  "description": "Material 3 Expressive Islamic prayer times, Qibla compass, Quran, Azkar, and Hijri calendar app.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
