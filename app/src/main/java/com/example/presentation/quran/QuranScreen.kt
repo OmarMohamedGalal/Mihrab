@@ -592,6 +592,7 @@ private fun QuranBrowserView(
 
                     1 -> {
                         MushafPagesBrowserGrid(
+                            uiState = uiState,
                             viewModel = viewModel,
                             isArabic = isArabic
                         )
@@ -700,10 +701,12 @@ private fun QuranBrowserView(
 
 @Composable
 private fun MushafPagesBrowserGrid(
+    uiState: QuranUiState,
     viewModel: QuranViewModel,
     isArabic: Boolean
 ) {
     val strings = LocalStrings.current
+    val khatmah = uiState.khatmahState
     var pageInput by remember { mutableStateOf("1") }
     val allPages = remember { (1..QuranMetadata.TOTAL_MUSHAF_PAGES).toList() }
     val starterPages = remember { listOf(1, 601, 602, 603, 604) }
@@ -775,17 +778,102 @@ private fun MushafPagesBrowserGrid(
             }
         }
 
+        // Mihrab Khatmah Progress & Schedule Card
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("khatmah_progress_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isArabic) {
+                                    "ختمة القرآن • ${khatmah.completedPagesCount} / 604 صفحة"
+                                } else {
+                                    "Khatmah Progress • ${khatmah.completedPagesCount} / 604 Pages"
+                                },
+                                style = MaterialTheme.typography.titleSmall,
+                                fontFamily = NotoSansArabicFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = if (isArabic) {
+                                    "الورد اليومي: ${khatmah.dailyPagesGoal} صفحة (${khatmah.targetDays} يوماً)"
+                                } else {
+                                    "Daily goal: ${khatmah.dailyPagesGoal} pages/day (${khatmah.targetDays}-day plan)"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = NotoSansArabicFamily,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                        FilledTonalButton(
+                            onClick = { viewModel.openMushafPage(khatmah.nextUnreadPage) },
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.testTag("khatmah_continue_button")
+                        ) {
+                            Text(
+                                text = if (isArabic) "صفحة ${khatmah.nextUnreadPage}" else "Page ${khatmah.nextUnreadPage}",
+                                fontFamily = RobotoMonoFamily,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { khatmah.progressFraction },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(30, 60, 90).forEach { days ->
+                            FilterChip(
+                                selected = khatmah.targetDays == days,
+                                onClick = { viewModel.setKhatmahTargetDays(days) },
+                                label = {
+                                    Text(
+                                        text = if (isArabic) "$days يوم" else "${days}d",
+                                        fontFamily = RobotoMonoFamily
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         items(allPages, key = { it }) { pageNum ->
             val surahNames = remember(pageNum) {
                 QuranMetadata.surahsOnPage(pageNum).joinToString(" • ") { it.nameAr }
             }
+            val juzNum = remember(pageNum) { QuranMetadata.juzForPage(pageNum).number }
+            val hizbNum = remember(pageNum) { QuranScriptFormatter.hizbForPage(pageNum) }
+            val isPageRead = khatmah.readPages.contains(pageNum)
             val isStarterOffline = pageNum in starterPages
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = if (isStarterOffline) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
+                color = when {
+                    isPageRead -> EmeraldAligned.copy(alpha = 0.18f)
+                    isStarterOffline -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                    else -> MaterialTheme.colorScheme.surfaceContainer
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -796,13 +884,26 @@ private fun MushafPagesBrowserGrid(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "$pageNum",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontFamily = RobotoMonoFamily,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "$pageNum",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontFamily = RobotoMonoFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isPageRead) EmeraldAligned else MaterialTheme.colorScheme.primary
+                        )
+                        if (isPageRead) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "Read",
+                                tint = EmeraldAligned,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = surahNames,
                         fontFamily = NotoSansArabicFamily,
@@ -810,6 +911,12 @@ private fun MushafPagesBrowserGrid(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "J$juzNum • H$hizbNum",
+                        fontFamily = RobotoMonoFamily,
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                     )
                 }
             }

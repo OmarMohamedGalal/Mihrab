@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 
 class AppContainer(context: Context) {
 
-    private val appContext = context.applicationContext
+    val appContext: Context = context.applicationContext
 
     val database: AppDatabase by lazy {
         Room.databaseBuilder(appContext, AppDatabase::class.java, "mihrab_db")

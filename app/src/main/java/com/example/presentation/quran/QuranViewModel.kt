@@ -1,5 +1,6 @@
 package com.example.presentation.quran
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -19,6 +20,27 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
+
+data class KhatmahProgressState(
+    val readPages: Set<Int> = emptySet(),
+    val targetDays: Int = 30
+) {
+    val completedPagesCount: Int
+        get() = readPages.size
+
+    val progressFraction: Float
+        get() = (readPages.size.toFloat() / QuranMetadata.TOTAL_MUSHAF_PAGES).coerceIn(0f, 1f)
+
+    val dailyPagesGoal: Int
+        get() = ceil(QuranMetadata.TOTAL_MUSHAF_PAGES.toDouble() / targetDays.coerceAtLeast(1)).toInt()
+
+    val currentReachPage: Int
+        get() = readPages.maxOrNull() ?: 1
+
+    val nextUnreadPage: Int
+        get() = (1..QuranMetadata.TOTAL_MUSHAF_PAGES).firstOrNull { !readPages.contains(it) } ?: 1
+}
 
 data class QuranUiState(
     val prefs: UserPreferences = UserPreferences(),
@@ -33,11 +55,15 @@ data class QuranUiState(
     val isLoadingSurah: Boolean = false,
     val surahLoadError: String? = null,
     val downloadProgress: DownloadProgress? = null,
-    val audioState: QuranAudioState = QuranAudioState()
+    val audioState: QuranAudioState = QuranAudioState(),
+    val tajweedEnabled: Boolean = true,
+    val khatmahState: KhatmahProgressState = KhatmahProgressState()
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class QuranViewModel(private val container: AppContainer) : ViewModel() {
+
+    private val khatmahPrefs = container.appContext.getSharedPreferences("mihrab.quran.v1", Context.MODE_PRIVATE)
 
     private val selectedSurah = MutableStateFlow<Int?>(null)
     private val selectedMushafPage = MutableStateFlow<Int?>(null)
@@ -46,6 +72,25 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
     private val isLoadingSurah = MutableStateFlow(false)
     private val surahLoadError = MutableStateFlow<String?>(null)
     private val downloadProgress = MutableStateFlow<DownloadProgress?>(null)
+    private val tajweedEnabled = MutableStateFlow(khatmahPrefs.getBoolean("tajweed_enabled", true))
+    private val khatmahState = MutableStateFlow(loadKhatmahState())
+
+    private fun loadKhatmahState(): KhatmahProgressState {
+        val rawPages = khatmahPrefs.getStringSet("read_pages", emptySet()).orEmpty()
+        val parsedPages = rawPages.mapNotNull { it.toIntOrNull() }
+            .filter { it in 1..QuranMetadata.TOTAL_MUSHAF_PAGES }
+            .toSet()
+        val targetDays = khatmahPrefs.getInt("target_days", 30).coerceIn(7, 365)
+        return KhatmahProgressState(readPages = parsedPages, targetDays = targetDays)
+    }
+
+    private fun persistKhatmahState(state: KhatmahProgressState) {
+        khatmahState.value = state
+        khatmahPrefs.edit()
+            .putStringSet("read_pages", state.readPages.map { it.toString() }.toSet())
+            .putInt("target_days", state.targetDays)
+            .apply()
+    }
 
     private val currentVersesFlow = combine(selectedSurah, selectedMushafPage) { surah, page ->
         surah to page
@@ -70,7 +115,9 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
         isLoadingSurah,
         surahLoadError,
         downloadProgress,
-        container.quranAudioManager.state
+        container.quranAudioManager.state,
+        tajweedEnabled,
+        khatmahState
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         QuranUiState(
@@ -86,12 +133,17 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
             isLoadingSurah = values[9] as Boolean,
             surahLoadError = values[10] as String?,
             downloadProgress = values[11] as DownloadProgress?,
-            audioState = values[12] as QuranAudioState
+            audioState = values[12] as QuranAudioState,
+            tajweedEnabled = values[13] as Boolean,
+            khatmahState = values[14] as KhatmahProgressState
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000L),
-        initialValue = QuranUiState()
+        initialValue = QuranUiState(
+            tajweedEnabled = tajweedEnabled.value,
+            khatmahState = khatmahState.value
+        )
     )
 
     fun openSurah(surahNumber: Int, ayahNumber: Int = 1) {
@@ -132,6 +184,42 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
         selectedSurah.value = null
         selectedMushafPage.value = null
         surahLoadError.value = null
+    }
+
+    fun toggleTajweed() {
+        val next = !tajweedEnabled.value
+        tajweedEnabled.value = next
+        khatmahPrefs.edit().putBoolean("tajweed_enabled", next).apply()
+    }
+
+    fun togglePageRead(pageNumber: Int) {
+        val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+        val current = khatmahState.value
+        val updatedPages = if (current.readPages.contains(clamped)) {
+            current.readPages - clamped
+        } else {
+            current.readPages + clamped
+        }
+        persistKhatmahState(current.copy(readPages = updatedPages))
+    }
+
+    fun markPageReadAndAdvance(pageNumber: Int) {
+        val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+        val current = khatmahState.value
+        persistKhatmahState(current.copy(readPages = current.readPages + clamped))
+        if (clamped < QuranMetadata.TOTAL_MUSHAF_PAGES) {
+            openMushafPage(clamped + 1)
+        }
+    }
+
+    fun setKhatmahTargetDays(days: Int) {
+        val current = khatmahState.value
+        persistKhatmahState(current.copy(targetDays = days.coerceIn(7, 365)))
+    }
+
+    fun resetKhatmahProgress() {
+        val current = khatmahState.value
+        persistKhatmahState(current.copy(readPages = emptySet()))
     }
 
     fun updateSearchQuery(query: String) {

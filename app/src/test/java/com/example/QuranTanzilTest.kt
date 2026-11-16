@@ -95,4 +95,27 @@ class QuranTanzilTest {
             assertTrue("Reciter ${r.id} URL invalid", r.surahMp3Url(18).startsWith("https://") && r.surahMp3Url(18).endsWith("/018.mp3"))
         }
     }
+
+    @Test
+    fun tajweedSpansHizbAndKhatmahProgressWorkAccurately() {
+        val sample = "إِنَّا أَعْطَيْنَـٰكَ ٱلْكَوْثَرَ ۝ قُلْ هُوَ ٱللَّهُ أَحَدٌ"
+        val spans = QuranScriptFormatter.findTajweedSpans(sample)
+        assertTrue("Expected Tajweed spans in sample Quranic text", spans.isNotEmpty())
+        assertTrue(spans.any { it.rule == com.example.data.quran.TajweedRule.GHUNNAH })
+        assertTrue(spans.any { it.rule == com.example.data.quran.TajweedRule.MADD })
+
+        assertEquals(1, QuranScriptFormatter.hizbForPage(1))
+        assertEquals(60, QuranScriptFormatter.hizbForPage(604))
+        assertTrue(QuranScriptFormatter.rubInHizbForPage(604) in 1..4)
+        assertEquals(1, QuranScriptFormatter.manzilForSurah(1))
+        assertEquals(7, QuranScriptFormatter.manzilForSurah(114))
+
+        val khatmah = com.example.presentation.quran.KhatmahProgressState(
+            readPages = setOf(1, 2, 3),
+            targetDays = 30
+        )
+        assertEquals(3, khatmah.completedPagesCount)
+        assertEquals(21, khatmah.dailyPagesGoal)
+        assertEquals(4, khatmah.nextUnreadPage)
+    }
 }

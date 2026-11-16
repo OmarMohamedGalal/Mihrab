@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +29,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -57,15 +60,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.i18n.AppLanguage
 import com.example.core.i18n.LocalStrings
 import com.example.data.local.QuranVerseEntity
 import com.example.data.quran.QuranMetadata
@@ -86,23 +92,15 @@ fun TanzilSurahReaderView(
     BackHandler(onBack = onBack)
 
     val strings = LocalStrings.current
+    val isArabic = strings.language == AppLanguage.ARABIC
     val prefs = uiState.prefs
     val nightMode = prefs.quranNightMode
     val isMushafMode = prefs.quranMushafMode
     val isSimpleScript = prefs.quranSimpleScript
+    val tajweedEnabled = uiState.tajweedEnabled
     val isPageMode = mushafPage != null
 
-    val palette = remember(nightMode) {
-        MushafPalette(
-            pageBg = if (nightMode) Color(0xFF14110D) else Color(0xFFFBF7EC),
-            sheetBg = if (nightMode) Color(0xFF1D1812) else Color(0xFFFFFDF7),
-            frameBorder = if (nightMode) Color(0xFF4A3D29) else Color(0xFFD8C698),
-            inkColor = if (nightMode) Color(0xFFF3E9D4) else Color(0xFF1E1A12),
-            secondaryInk = if (nightMode) Color(0xFFC2B59B) else Color(0xFF5D5342),
-            goldAccent = if (nightMode) Color(0xFFE5C785) else Color(0xFF7B5B17),
-            highlightBg = if (nightMode) Color(0xFF332917) else Color(0xFFF3E7C4)
-        )
-    }
+    val palette = remember(nightMode) { rememberMushafPalette(nightMode) }
 
     val verses = uiState.currentSurahVerses
     val activePage = mushafPage
@@ -183,7 +181,7 @@ fun TanzilSurahReaderView(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isPageMode) surahMeta.nameAr else surahMeta.nameAr,
+                            text = surahMeta.nameAr,
                             fontFamily = NotoSansArabicFamily,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
@@ -206,6 +204,16 @@ fun TanzilSurahReaderView(
                 }
             },
             actions = {
+                IconButton(
+                    onClick = { viewModel.toggleTajweed() },
+                    modifier = Modifier.testTag("tanzil_tajweed_icon_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ColorLens,
+                        contentDescription = "Tajweed Colors",
+                        tint = if (tajweedEnabled) palette.emeraldAccent else palette.secondaryInk
+                    )
+                }
                 IconButton(onClick = { viewModel.toggleTranslation() }) {
                     Icon(
                         imageVector = Icons.Filled.Translate,
@@ -223,7 +231,7 @@ fun TanzilSurahReaderView(
             }
         )
 
-        // 2. Tanzil & Mushaf Controls Strip
+        // 2. Mihrab Mushaf & Tajweed Controls Strip
         Surface(
             color = palette.sheetBg,
             border = BorderStroke(0.5.dp, palette.frameBorder.copy(alpha = 0.55f))
@@ -251,6 +259,12 @@ fun TanzilSurahReaderView(
                         onClick = { if (isMushafMode) viewModel.toggleMushafMode() },
                         label = { Text(strings.verseByVerseLabel) },
                         modifier = Modifier.testTag("tanzil_mode_verses")
+                    )
+                    FilterChip(
+                        selected = tajweedEnabled,
+                        onClick = { viewModel.toggleTajweed() },
+                        label = { Text(if (isArabic) "تجويد ملون" else "Tajwīd") },
+                        modifier = Modifier.testTag("tanzil_tajweed_toggle")
                     )
                     FilterChip(
                         selected = !isSimpleScript,
@@ -306,6 +320,13 @@ fun TanzilSurahReaderView(
                             }
                         }
                     }
+                }
+
+                if (tajweedEnabled) {
+                    TajweedLegendBar(
+                        palette = palette,
+                        isArabic = isArabic
+                    )
                 }
 
                 Row(
@@ -376,19 +397,22 @@ fun TanzilSurahReaderView(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (isMushafMode) {
-                    // Real Medina Mushaf 604-page cards (shows multi-surah pages, headers, standalone Bismillah)
+                    // Authentic Mihrab Madinah Mushaf 604-page cards (multi-surah pages, double frames, Tajweed coloring, Khatmah toggle)
                     items(pagesMap.entries.toList(), key = { it.key }) { (pageNum, pageVerses) ->
                         MedinaMushafPageCard(
                             pageNumber = pageNum,
                             pageVerses = pageVerses,
                             fontSizeSp = prefs.quranFontSizeSp,
                             isSimpleScript = isSimpleScript,
+                            tajweedEnabled = tajweedEnabled,
+                            isPageMarkedRead = uiState.khatmahState.readPages.contains(pageNum),
                             selectedVerseKey = selectedVerseKey,
                             activeAudioGlobal = uiState.audioState.globalAyahNumber,
                             isAudioActive = uiState.audioState.isPlaying || uiState.audioState.isBuffering,
                             strings = strings,
                             palette = palette,
-                            onSelectVerse = { v -> selectedVerseKey = v.surahNumber to v.ayahNumber }
+                            onSelectVerse = { v -> selectedVerseKey = v.surahNumber to v.ayahNumber },
+                            onTogglePageRead = { p -> viewModel.togglePageRead(p) }
                         )
                     }
 
@@ -423,7 +447,7 @@ fun TanzilSurahReaderView(
                         }
                     }
                 } else {
-                    // Verse-by-Verse Mode with Surah Banner + Standalone Bismillah (never inside Ayah 1)
+                    // Verse-by-Verse Mode with Surah Banner + Standalone Bismillah + Tajweed Coloring
                     items(verses, key = { it.globalNumber }) { verse ->
                         if (verse.ayahNumber == 1) {
                             val vSurahMeta = QuranMetadata.surahByNumber(verse.surahNumber)
@@ -528,13 +552,29 @@ fun TanzilSurahReaderView(
                                     }
                                 }
 
+                                val annotatedAyah = buildAnnotatedString {
+                                    appendFormattedVerseWithTajweed(
+                                        formattedArabic = formattedArabic,
+                                        tajweedEnabled = tajweedEnabled,
+                                        defaultInkColor = palette.inkColor,
+                                        palette = palette
+                                    )
+                                    withStyle(
+                                        SpanStyle(
+                                            color = palette.goldAccent,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    ) {
+                                        append(" ﴿${QuranScriptFormatter.toArabicIndic(verse.ayahNumber)}﴾")
+                                    }
+                                }
+
                                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                                     Text(
-                                        text = "$formattedArabic ﴿${QuranScriptFormatter.toArabicIndic(verse.ayahNumber)}﴾",
+                                        text = annotatedAyah,
                                         fontFamily = AmiriFamily,
                                         fontSize = prefs.quranFontSizeSp.sp,
                                         lineHeight = (prefs.quranFontSizeSp * 1.85f).sp,
-                                        color = palette.inkColor,
                                         textAlign = TextAlign.Start,
                                         modifier = Modifier.fillMaxWidth()
                                     )
@@ -553,43 +593,73 @@ fun TanzilSurahReaderView(
                     }
                 }
 
-                // Medina Mushaf Page Turner Footer when browsing by Page
+                // Medina Mushaf Page Turner & Khatmah Advance Footer when browsing by Page
                 if (mushafPage != null) {
                     item(key = "mushaf_page_turner") {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            FilledTonalButton(
-                                onClick = { viewModel.openMushafPage(mushafPage - 1) },
-                                enabled = mushafPage > 1,
-                                shape = CircleShape,
-                                modifier = Modifier.testTag("prev_mushaf_page_button")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(strings.prevPage)
+                                FilledTonalButton(
+                                    onClick = { viewModel.openMushafPage(mushafPage - 1) },
+                                    enabled = mushafPage > 1,
+                                    shape = CircleShape,
+                                    modifier = Modifier.testTag("prev_mushaf_page_button")
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(strings.prevPage)
+                                }
+
+                                Text(
+                                    text = "$mushafPage / ${QuranMetadata.TOTAL_MUSHAF_PAGES}",
+                                    fontFamily = RobotoMonoFamily,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = palette.goldAccent
+                                )
+
+                                FilledTonalButton(
+                                    onClick = { viewModel.openMushafPage(mushafPage + 1) },
+                                    enabled = mushafPage < QuranMetadata.TOTAL_MUSHAF_PAGES,
+                                    shape = CircleShape,
+                                    modifier = Modifier.testTag("next_mushaf_page_button")
+                                ) {
+                                    Text(strings.nextPage)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                                }
                             }
 
-                            Text(
-                                text = "$mushafPage / ${QuranMetadata.TOTAL_MUSHAF_PAGES}",
-                                fontFamily = RobotoMonoFamily,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = palette.goldAccent
-                            )
-
+                            // Complete Page in Khatmah & Advance Button
                             FilledTonalButton(
-                                onClick = { viewModel.openMushafPage(mushafPage + 1) },
-                                enabled = mushafPage < QuranMetadata.TOTAL_MUSHAF_PAGES,
+                                onClick = { viewModel.markPageReadAndAdvance(mushafPage) },
                                 shape = CircleShape,
-                                modifier = Modifier.testTag("next_mushaf_page_button")
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("khatmah_complete_and_next_button")
                             ) {
-                                Text(strings.nextPage)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isArabic) {
+                                        "إتمام الصفحة $mushafPage في الختمة والانتقال للتالية"
+                                    } else {
+                                        "Complete Page $mushafPage in Khatmah & Next Page"
+                                    },
+                                    fontFamily = NotoSansArabicFamily,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                     }
