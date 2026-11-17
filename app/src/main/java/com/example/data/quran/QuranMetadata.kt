@@ -209,6 +209,14 @@ object QuranMetadata {
         QuranVerseEntity(5, 1, 5, "إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ", "It is You we worship and You we ask for help.", 1, 1),
         QuranVerseEntity(6, 1, 6, "ٱهْدِنَا ٱلصِّرَٰطَ ٱلْمُسْتَقِيمَ", "Guide us to the straight path -", 1, 1),
         QuranVerseEntity(7, 1, 7, "صِرَٰطَ ٱلَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ ٱلْمَغْضُوبِ عَلَيْهِمْ وَلَا ٱلضَّآلِّينَ", "The path of those upon whom You have bestowed favor, not of those who have evoked [Your] anger or of those who are astray.", 1, 1),
+        // Surah 2: Al-Baqarah Opening (Page 2)
+        QuranVerseEntity(8, 2, 1, "الٓمٓ", "Alif, Lam, Meem.", 1, 2),
+        QuranVerseEntity(9, 2, 2, "ذَٰلِكَ ٱلْكِتَـٰبُ لَا رَيْبَ ۛ فِيهِ ۛ هُدًى لِّلْمُتَّقِينَ", "This is the Book about which there is no doubt, a guidance for those conscious of Allah -", 1, 2),
+        QuranVerseEntity(10, 2, 3, "ٱلَّذِينَ يُؤْمِنُونَ بِٱلْغَيْبِ وَيُقِيمُونَ ٱلصَّلَوٰةَ وَمِمَّا رَزَقْنَـٰهُمْ يُنفِقُونَ", "Who believe in the unseen, establish prayer, and spend out of what We have provided for them,", 1, 2),
+        QuranVerseEntity(11, 2, 4, "وَٱلَّذِينَ يُؤْمِنُونَ بِمَآ أُنزِلَ إِلَيْكَ وَمَآ أُنزِلَ مِن قَبْلِكَ وَبِٱلْـَٔاخِرَةِ هُمْ يُوقِنُونَ", "And who believe in what has been revealed to you, [O Muhammad], and what was revealed before you, and of the Hereafter they are certain [in faith].", 1, 2),
+        QuranVerseEntity(12, 2, 5, "أُو۟لَـٰٓئِكَ عَلَىٰ هُدًى مِّن رَّبِّهِمْ ۖ وَأُو۟لَـٰٓئِكَ هُمُ ٱلْمُفْلِحُونَ", "Those are upon [right] guidance from their Lord, and it is those who are the successful.", 1, 2),
+        QuranVerseEntity(13, 2, 6, "إِنَّ ٱلَّذِينَ كَفَرُوا۟ سَوَآءٌ عَلَيْهِمْ ءَأَنذَرْتَهُمْ أَمْ لَمْ تُنذِرْهُمْ لَا يُؤْمِنُونَ", "Indeed, those who disbelieve - it is all the same for them whether you warn them or do not warn them - they will not believe.", 1, 3),
+        QuranVerseEntity(14, 2, 7, "خَتَمَ ٱللَّهُ عَلَىٰ قُلُوبِهِمْ وَعَلَىٰ سَمْعِهِمْ ۖ وَعَلَىٰٓ أَبْصَـٰرِهِمْ غِشَـٰوَةٌ ۖ وَلَهُمْ عَذَابٌ عَظِيمٌ", "Allah has set a seal upon their hearts and upon their hearing, and over their vision is a veil. And for them is a great punishment.", 1, 3),
         // Surah 103: Al-'Asr (Page 601)
         QuranVerseEntity(6177, 103, 1, "وَٱلْعَصْرِ", "By time,", 30, 601),
         QuranVerseEntity(6178, 103, 2, "إِنَّ ٱلْإِنسَـٰنَ لَفِى خُسْرٍ", "Indeed, mankind is in loss,", 30, 601),

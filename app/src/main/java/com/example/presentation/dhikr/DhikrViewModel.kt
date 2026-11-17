@@ -115,6 +115,13 @@ class DhikrViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    fun resetAzkarItem(id: String) {
+        val currentMap = azkarProgress.value.toMutableMap()
+        if (currentMap.remove(id) != null) {
+            azkarProgress.value = currentMap
+        }
+    }
+
     fun resetAzkarCategory(ids: List<String>) {
         val currentMap = azkarProgress.value.toMutableMap()
         ids.forEach { currentMap.remove(it) }

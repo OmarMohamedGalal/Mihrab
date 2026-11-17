@@ -36,7 +36,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private val requestedWidgetDestination = mutableStateOf<String?>(null)
-    private val requestedWidgetSurahNumber = mutableIntStateOf(0)
     private val widgetRequestNonce = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +63,6 @@ class MainActivity : ComponentActivity() {
             val mainUiState by mainViewModel.uiState.collectAsStateWithLifecycle()
             val prefs = mainUiState.prefs
             val widgetTarget by requestedWidgetDestination
-            val widgetSurah by requestedWidgetSurahNumber
             val requestNonce by widgetRequestNonce
 
             MihrabTheme(
@@ -81,7 +79,6 @@ class MainActivity : ComponentActivity() {
                         quranViewModel = quranViewModel,
                         dhikrViewModel = dhikrViewModel,
                         widgetDestination = widgetTarget,
-                        widgetSurahNumber = widgetSurah,
                         widgetRequestNonce = requestNonce
                     )
                 }
@@ -99,10 +96,6 @@ class MainActivity : ComponentActivity() {
         val dest = intent?.getStringExtra(WidgetDestinations.EXTRA_WIDGET_DESTINATION)
         if (!dest.isNullOrBlank()) {
             requestedWidgetDestination.value = dest
-            val surah = intent.getIntExtra(WidgetDestinations.EXTRA_WIDGET_SURAH_NUMBER, 0)
-            if (surah > 0) {
-                requestedWidgetSurahNumber.intValue = surah
-            }
             widgetRequestNonce.intValue += 1
         }
     }

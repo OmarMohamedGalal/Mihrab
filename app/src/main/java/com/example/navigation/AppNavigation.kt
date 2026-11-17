@@ -72,7 +72,6 @@ fun AppNavigation(
     quranViewModel: QuranViewModel,
     dhikrViewModel: DhikrViewModel,
     widgetDestination: String? = null,
-    widgetSurahNumber: Int = 0,
     widgetRequestNonce: Int = 0
 ) {
     val strings = LocalStrings.current
@@ -118,8 +117,6 @@ fun AppNavigation(
     }
 
     var handledWidgetNonce by remember { mutableIntStateOf(0) }
-    var openListenPlayerNonce by remember { mutableIntStateOf(0) }
-    var openListenSurahNumber by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(widgetDestination, widgetRequestNonce, currentDest) {
         if (currentDest != null && widgetRequestNonce > handledWidgetNonce && !widgetDestination.isNullOrBlank()) {
@@ -131,14 +128,6 @@ fun AppNavigation(
                     navController.navigate(CalendarRoute) {
                         launchSingleTop = true
                     }
-                }
-                WidgetDestinations.QURAN_LISTEN -> {
-                    val targetSurah = if (widgetSurahNumber > 0) widgetSurahNumber else quranUiState.prefs.lastReadSurah.coerceIn(1, 114)
-                    quranViewModel.closeSurahReader()
-                    quranViewModel.selectSurahForListenPlayer(targetSurah)
-                    openListenSurahNumber = targetSurah
-                    openListenPlayerNonce += 1
-                    navigateTopLevel(QuranRoute)
                 }
             }
         }
@@ -215,9 +204,7 @@ fun AppNavigation(
                     composable<QuranRoute> {
                         QuranScreen(
                             uiState = quranUiState,
-                            viewModel = quranViewModel,
-                            openListenSurahNumber = openListenSurahNumber,
-                            openListenPlayerNonce = openListenPlayerNonce
+                            viewModel = quranViewModel
                         )
                     }
                     composable<DhikrRoute> {

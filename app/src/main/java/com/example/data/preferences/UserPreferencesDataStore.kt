@@ -67,7 +67,8 @@ data class UserPreferences(
     val quranSimpleScript: Boolean = false,
     val lastReadSurah: Int = 1,
     val lastReadAyah: Int = 1,
-    val selectedReciterId: String = "ar.alafasy",
+    val lastReadPage: Int = 1,
+    val selectedReciterId: String = "ar.husary",
     val tasbeehDailyGoal: Int = 100,
     val quranWidgetVerseIndex: Int = 0
 ) {
@@ -122,6 +123,7 @@ class UserPreferencesDataStore(private val context: Context) {
         val QURAN_SIMPLE_SCRIPT = booleanPreferencesKey("quran_simple_script")
         val LAST_SURAH = intPreferencesKey("last_surah")
         val LAST_AYAH = intPreferencesKey("last_ayah")
+        val LAST_PAGE = intPreferencesKey("last_read_page")
         val RECITER = stringPreferencesKey("reciter")
         val TASBEEH_GOAL = intPreferencesKey("tasbeeh_goal")
         val QURAN_WIDGET_VERSE_INDEX = intPreferencesKey("quran_widget_verse_index")
@@ -169,7 +171,8 @@ class UserPreferencesDataStore(private val context: Context) {
             quranSimpleScript = p[Keys.QURAN_SIMPLE_SCRIPT] ?: false,
             lastReadSurah = p[Keys.LAST_SURAH] ?: 1,
             lastReadAyah = p[Keys.LAST_AYAH] ?: 1,
-            selectedReciterId = p[Keys.RECITER] ?: "ar.alafasy",
+            lastReadPage = (p[Keys.LAST_PAGE] ?: 1).coerceIn(1, 604),
+            selectedReciterId = p[Keys.RECITER] ?: "ar.husary",
             tasbeehDailyGoal = p[Keys.TASBEEH_GOAL] ?: 100,
             quranWidgetVerseIndex = p[Keys.QURAN_WIDGET_VERSE_INDEX] ?: 0
         )
@@ -207,8 +210,14 @@ class UserPreferencesDataStore(private val context: Context) {
     }
 
     suspend fun updateLastRead(surah: Int, ayah: Int) = edit {
-        it[Keys.LAST_SURAH] = surah
-        it[Keys.LAST_AYAH] = ayah
+        it[Keys.LAST_SURAH] = surah.coerceIn(1, 114)
+        it[Keys.LAST_AYAH] = ayah.coerceAtLeast(1)
+    }
+
+    suspend fun updateLastReadPage(page: Int, surah: Int, ayah: Int = 1) = edit {
+        it[Keys.LAST_PAGE] = page.coerceIn(1, 604)
+        it[Keys.LAST_SURAH] = surah.coerceIn(1, 114)
+        it[Keys.LAST_AYAH] = ayah.coerceAtLeast(1)
     }
 
     suspend fun updateOffset(type: PrayerType, minutes: Int) = edit {

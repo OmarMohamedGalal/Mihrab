@@ -10,6 +10,4 @@
     <string name="widget_qibla_circle_desc">Expressive Qibla direction circle — tap for live compass</string>
     <string name="widget_timetable_label">Prayer Timetable</string>
     <string name="widget_timetable_desc">Today\'s 5 daily prayer times — reshapes to any size</string>
-    <string name="widget_quran_listen_label">Quran Listen</string>
-    <string name="widget_quran_listen_desc">Expressive Quran audio disc widget — tap center to open Surah player or tap button to pause/stop</string>
 </resources>

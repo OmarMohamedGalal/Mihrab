@@ -104,6 +104,7 @@ import com.example.core.i18n.AppLanguage
 import com.example.core.i18n.LocalStrings
 import com.example.data.quran.QuranMetadata
 import com.example.data.quran.QuranRecitersCatalog
+import com.example.data.quran.QuranScriptFormatter
 import com.example.data.quran.ReciterOption
 import com.example.data.quran.SurahMeta
 import com.example.services.QuranAudioState
@@ -194,7 +195,10 @@ fun QuranListenView(
                 trailingIcon = {
                     if (listenSearchQuery.isNotEmpty()) {
                         IconButton(onClick = { listenSearchQuery = "" }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Clear")
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = if (isArabic) "مسح" else "Clear"
+                            )
                         }
                     }
                 },
@@ -207,11 +211,11 @@ fun QuranListenView(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Horizontal Tabs matching the attached Samsung Music / M3 Expressive header
+            // Horizontal Tabs matching M3 Expressive header
             val tabs = if (isArabic) {
                 listOf(
                     "السور (١١٤)",
-                    "القراء (${QuranRecitersCatalog.reciters.size})",
+                    "القراء (${QuranScriptFormatter.toArabicIndic(QuranRecitersCatalog.reciters.size)})",
                     "المفضلة",
                     "التحميلات"
                 )
@@ -305,7 +309,7 @@ fun QuranListenView(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Shuffle,
-                            contentDescription = "Shuffle",
+                            contentDescription = if (isArabic) "تبديل عشوائي" else "Shuffle",
                             tint = if (audio.isShuffleEnabled) {
                                 MaterialTheme.colorScheme.primary
                             } else {
@@ -326,7 +330,7 @@ fun QuranListenView(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = "Play",
+                            contentDescription = if (isArabic) "تشغيل" else "Play",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -596,7 +600,7 @@ private fun SurahTrackList(
                             if (isCurrentPlaying && audio.isPlaying) {
                                 Icon(
                                     imageVector = Icons.Filled.Equalizer,
-                                    contentDescription = "Playing",
+                                    contentDescription = if (isArabic) "جاري التشغيل" else "Playing",
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -620,7 +624,7 @@ private fun SurahTrackList(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (isArabic) {
-                                "${surah.number}. سورة ${surah.nameAr}"
+                                "${QuranScriptFormatter.toArabicIndic(surah.number)}. سورة ${surah.nameAr}"
                             } else {
                                 "${surah.number}. ${surah.nameEn} • سورة ${surah.nameAr}"
                             },
@@ -634,13 +638,14 @@ private fun SurahTrackList(
                         Text(
                             text = buildString {
                                 append(if (isArabic) selectedReciter.nameAr else selectedReciter.nameEn)
-                                append(" • ${surah.ayahCount} ")
-                                append(if (isArabic) "آية" else "Ayahs")
+                                append(" • ")
+                                append(if (isArabic) "${QuranScriptFormatter.toArabicIndic(surah.ayahCount)} آية" else "${surah.ayahCount} Ayahs")
                                 if (isDownloaded) {
                                     append(if (isArabic) " • متاح دون إنترنت" else " • Offline")
                                 }
                             },
                             style = MaterialTheme.typography.bodySmall,
+                            fontFamily = NotoSansArabicFamily,
                             color = subtitleColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1071,9 +1076,14 @@ private fun ExpressiveFullNowPlayingScreen(
                             text = if (isDownloaded) {
                                 if (isArabic) "محفوظة دون إنترنت" else "Downloaded Offline"
                             } else {
-                                "${surah.ayahCount} ${if (isArabic) "آية" else "Ayahs"}"
+                                if (isArabic) {
+                                    "${QuranScriptFormatter.toArabicIndic(surah.ayahCount)} آية"
+                                } else {
+                                    "${surah.ayahCount} Ayahs"
+                                }
                             },
                             style = MaterialTheme.typography.labelMedium,
+                            fontFamily = NotoSansArabicFamily,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
                     }
@@ -1104,7 +1114,7 @@ private fun ExpressiveFullNowPlayingScreen(
             if (!audio.errorMessage.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = audio.errorMessage,
+                    text = if (isArabic) "تعذّر تشغيل التلاوة، يرجى التحقق من الاتصال" else audio.errorMessage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center
@@ -1272,14 +1282,14 @@ private fun ExpressiveFullNowPlayingScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.Filled.Repeat,
-                            contentDescription = "Repeat",
+                            contentDescription = if (isArabic) "تكرار" else "Repeat",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = audio.repeatMode.label,
+                            text = if (isArabic) audio.repeatMode.labelAr else audio.repeatMode.label,
                             style = MaterialTheme.typography.labelSmall,
-                            fontFamily = RobotoMonoFamily,
+                            fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily,
                             fontSize = 9.sp,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -1434,11 +1444,15 @@ private fun ExpressiveFullNowPlayingScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = when {
-                                downloadProgress != null -> "${(downloadProgress * 100).toInt()}%"
+                                downloadProgress != null -> {
+                                    val pct = (downloadProgress * 100).toInt()
+                                    if (isArabic) "${QuranScriptFormatter.toArabicIndic(pct)}٪" else "$pct%"
+                                }
                                 isDownloaded -> if (isArabic) "محمل دون إنترنت" else "Offline Ready"
                                 else -> if (isArabic) "تحميل للاستماع دون نت" else "Download Offline"
                             },
                             style = MaterialTheme.typography.labelMedium,
+                            fontFamily = NotoSansArabicFamily,
                             fontWeight = FontWeight.Bold
                         )
                     }

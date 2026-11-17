@@ -53,26 +53,13 @@ import kotlin.math.sin
 
 object WidgetDestinations {
     const val EXTRA_WIDGET_DESTINATION = "extra_widget_destination"
-    const val EXTRA_WIDGET_SURAH_NUMBER = "extra_widget_surah_number"
     const val PRAYER = "prayer"
     const val QIBLA = "qibla"
     const val CALENDAR = "calendar"
-    const val QURAN_LISTEN = "quran_listen"
 
     fun openAppAction(context: Context, destination: String): Action {
         val intent = Intent(context, MainActivity::class.java).apply {
             putExtra(EXTRA_WIDGET_DESTINATION, destination)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        return actionStartActivity(intent)
-    }
-
-    fun openQuranListenPlayerAction(context: Context, surahNumber: Int): Action {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            putExtra(EXTRA_WIDGET_DESTINATION, QURAN_LISTEN)
-            putExtra(EXTRA_WIDGET_SURAH_NUMBER, surahNumber.coerceIn(1, 114))
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_CLEAR_TOP or
                 Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -417,184 +404,6 @@ object WidgetShapeRenderer {
 
         return bitmap
     }
-
-    /**
-     * Generates the Material 3 Expressive "Quran Listen" vinyl disc widget bitmap matching
-     * the attached reference image:
-     * - Large central dark vinyl circular disc with the Surah name in the middle.
-     * - Top-right overlapping olive-green circular badge with the concentric circular video/media icon
-     *   (moved from the center of the reference image to replace the top-right like icon).
-     * - Bottom-left overlapping warm amber-brown squircle button with Pause/Stop icon.
-     */
-    fun createQuranListenDiscBitmap(
-        sizePx: Int,
-        surahNameAr: String,
-        surahNameEn: String,
-        reciterName: String = "",
-        isPlaying: Boolean = false,
-        colors: ResolvedWidgetPalette
-    ): Bitmap {
-        val s = sizePx.coerceIn(160, 720)
-        val bitmap = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-
-        val cx = s * 0.50f
-        val cy = s * 0.50f
-        val discR = s * 0.37f
-
-        // 1. Main central dark vinyl circular disc (#211C1A matching attached reference image)
-        val discPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF211C1A).toArgb()
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(cx, cy, discR, discPaint)
-
-        // Subtle concentric vinyl groove rings
-        val groovePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF38302C).toArgb()
-            style = Paint.Style.STROKE
-            strokeWidth = (s * 0.006f).coerceAtLeast(1.2f)
-        }
-        canvas.drawCircle(cx, cy, discR * 0.84f, groovePaint)
-        canvas.drawCircle(cx, cy, discR * 0.68f, groovePaint)
-
-        // Center Surah Name label inside the middle of the disc (replacing the center video icon)
-        val centerPilW = discR * 1.18f
-        val centerPilH = discR * 0.56f
-        val centerRect = RectF(
-            cx - centerPilW / 2f,
-            cy - centerPilH / 2f,
-            cx + centerPilW / 2f,
-            cy + centerPilH / 2f
-        )
-        val centerBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFFE5D4C8).toArgb()
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(centerRect, centerPilH / 2f, centerPilH / 2f, centerBadgePaint)
-
-        val surahArPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF211C1A).toArgb()
-            textSize = s * 0.068f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-        val fmAr = surahArPaint.fontMetrics
-        val arBaseline = cy - (if (reciterName.isNotBlank() || surahNameEn.isNotBlank()) s * 0.018f else 0f) - (fmAr.ascent + fmAr.descent) / 2f
-        canvas.drawText("سورة $surahNameAr", cx, arBaseline, surahArPaint)
-
-        if (surahNameEn.isNotBlank()) {
-            val surahEnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color(0xFF5A493E).toArgb()
-                textSize = s * 0.040f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                textAlign = Paint.Align.CENTER
-            }
-            canvas.drawText(surahNameEn, cx, cy + s * 0.048f, surahEnPaint)
-        }
-
-        // 2. Top-Right Overlapping Olive-Green Circular Badge (#4B561B)
-        // Contains the concentric circular video/media play icon that was originally in the middle!
-        val topR = s * 0.148f
-        val topX = cx + discR * 0.60f
-        val topY = cy - discR * 0.62f
-
-        val topCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF4B561B).toArgb()
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(topX, topY, topR, topCirclePaint)
-
-        // Concentric circular video/media icon inside the top-right badge (matching the middle icon of reference image)
-        val outerMediaRingR = topR * 0.56f
-        val outerMediaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFFE5D4C8).toArgb()
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(topX, topY, outerMediaRingR, outerMediaPaint)
-
-        val innerMediaRingR = topR * 0.38f
-        val innerRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF211C1A).toArgb()
-            style = Paint.Style.STROKE
-            strokeWidth = (s * 0.011f).coerceAtLeast(2f)
-        }
-        canvas.drawCircle(topX, topY, innerMediaRingR, innerRingPaint)
-
-        val triRadius = topR * 0.19f
-        val mediaTriPath = Path().apply {
-            moveTo(topX - triRadius * 0.45f, topY - triRadius * 0.72f)
-            lineTo(topX + triRadius * 0.85f, topY)
-            lineTo(topX - triRadius * 0.45f, topY + triRadius * 0.72f)
-            close()
-        }
-        val mediaTriPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF211C1A).toArgb()
-            style = Paint.Style.FILL
-        }
-        canvas.drawPath(mediaTriPath, mediaTriPaint)
-
-        // 3. Bottom-Left Overlapping Warm Amber-Brown Squircle Pause/Stop Button (#6E3905)
-        val sqSize = s * 0.285f
-        val botX = cx - discR * 0.56f
-        val botY = cy + discR * 0.58f
-        val sqRect = RectF(
-            botX - sqSize / 2f,
-            botY - sqSize / 2f,
-            botX + sqSize / 2f,
-            botY + sqSize / 2f
-        )
-        val sqCorner = sqSize * 0.34f
-        val sqPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color(0xFF6E3905).toArgb()
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(sqRect, sqCorner, sqCorner, sqPaint)
-
-        // Icon inside bottom-left squircle: Pause bars when playing, or Pause/Play emblem
-        val iconColor = Color(0xFFC88B57).toArgb()
-        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = iconColor
-            style = Paint.Style.FILL
-        }
-        if (isPlaying) {
-            // Pause bars (two rounded vertical bars)
-            val barW = sqSize * 0.10f
-            val barH = sqSize * 0.34f
-            val gap = sqSize * 0.08f
-            canvas.drawRoundRect(
-                RectF(botX - gap / 2f - barW, botY - barH / 2f, botX - gap / 2f, botY + barH / 2f),
-                barW / 2f,
-                barW / 2f,
-                iconPaint
-            )
-            canvas.drawRoundRect(
-                RectF(botX + gap / 2f, botY - barH / 2f, botX + gap / 2f + barW, botY + barH / 2f),
-                barW / 2f,
-                barW / 2f,
-                iconPaint
-            )
-        } else {
-            // Pause / Stop control icon (two vertical pause bars + play triangle accent)
-            val barW = sqSize * 0.09f
-            val barH = sqSize * 0.30f
-            val gap = sqSize * 0.07f
-            canvas.drawRoundRect(
-                RectF(botX - gap / 2f - barW, botY - barH / 2f, botX - gap / 2f, botY + barH / 2f),
-                barW / 2f,
-                barW / 2f,
-                iconPaint
-            )
-            canvas.drawRoundRect(
-                RectF(botX + gap / 2f, botY - barH / 2f, botX + gap / 2f + barW, botY + barH / 2f),
-                barW / 2f,
-                barW / 2f,
-                iconPaint
-            )
-        }
-
-        return bitmap
-    }
 }
 
 object WidgetUpdater {
@@ -619,10 +428,6 @@ object WidgetUpdater {
         runCatching {
             val w = PrayerTimetableWidget()
             manager.getGlanceIds(PrayerTimetableWidget::class.java).forEach { w.update(context, it) }
-        }
-        runCatching {
-            val w = QuranListenWidget()
-            manager.getGlanceIds(QuranListenWidget::class.java).forEach { w.update(context, it) }
         }
     }
 }

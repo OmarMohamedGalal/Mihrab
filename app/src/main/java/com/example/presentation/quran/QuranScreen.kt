@@ -76,6 +76,7 @@ import com.example.core.i18n.LocalStrings
 import com.example.data.quran.QuranMetadata
 import com.example.data.quran.QuranScriptFormatter
 import com.example.ui.theme.AmiriFamily
+import com.example.ui.theme.AmiriQuranFamily
 import com.example.ui.theme.EmeraldAligned
 import com.example.ui.theme.NotoSansArabicFamily
 import com.example.ui.theme.RobotoMonoFamily
@@ -104,21 +105,26 @@ fun QuranScreen(
     }
 
     val isReaderOpen = uiState.selectedSurahNumber != null || uiState.selectedMushafPage != null
+    val audio = uiState.audioState
+    val showPersistentAudioBar = (quranMode == 0 || isReaderOpen) &&
+        audio.surahNumber > 0 &&
+        (audio.isPlaying || audio.isBuffering || audio.isPaused)
 
-    Box(modifier = modifier.fillMaxSize()) {
-        if (isReaderOpen) {
-            TanzilSurahReaderView(
-                surahNumber = uiState.selectedSurahNumber,
-                mushafPage = uiState.selectedMushafPage,
-                uiState = uiState,
-                viewModel = viewModel,
-                onBack = { viewModel.closeSurahReader() }
-            )
-        } else {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (isReaderOpen) {
+                TanzilSurahReaderView(
+                    surahNumber = uiState.selectedSurahNumber,
+                    mushafPage = uiState.selectedMushafPage,
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onBack = { viewModel.closeSurahReader() }
+                )
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                 // Top 2-Option Read / Listen M3 Expressive Pill Selector
                 Surface(
                     shape = CircleShape,
@@ -219,18 +225,19 @@ fun QuranScreen(
                 }
             }
         }
+        }
 
-        // Persistent Audio Bar when in Read mode (Listen mode has its own Expressive Mini Player Pill & Full Now Playing screen)
-        val audio = uiState.audioState
-        if ((quranMode == 0 || isReaderOpen) && audio.surahNumber > 0 && (audio.isPlaying || audio.isBuffering)) {
+        // Persistent Audio Bar docked below reader/browser while playing, buffering, or paused (for Continue/Pause/Stop)
+        if (showPersistentAudioBar) {
             val surahMeta = QuranMetadata.surahByNumber(audio.surahNumber)
+            val activeReciter = QuranMetadata.reciters.find { it.id == audio.reciterId }
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.inverseSurface,
                 tonalElevation = 8.dp,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
                     .widthIn(max = 640.dp)
                     .fillMaxWidth()
                     .testTag("quran_audio_bar")
@@ -241,7 +248,11 @@ fun QuranScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "${surahMeta.nameEn} • ${surahMeta.nameAr}",
+                            text = if (isArabic) {
+                                "سورة ${surahMeta.nameAr}"
+                            } else {
+                                "${surahMeta.nameEn} • ${surahMeta.nameAr}"
+                            },
                             style = MaterialTheme.typography.titleSmall,
                             fontFamily = NotoSansArabicFamily,
                             color = MaterialTheme.colorScheme.inverseOnSurface,
@@ -250,14 +261,20 @@ fun QuranScreen(
                         )
                         Text(
                             text = if (audio.isBuffering) {
-                                "Buffering..."
+                                if (isArabic) "جاري التحميل..." else "Buffering..."
+                            } else if (audio.isPaused) {
+                                val rName = if (isArabic) activeReciter?.nameAr.orEmpty() else activeReciter?.nameEn.orEmpty()
+                                if (isArabic) "متوقف مؤقتاً • $rName" else "Paused • $rName"
                             } else if (audio.isFullSurahMode) {
-                                QuranMetadata.reciters.find { it.id == audio.reciterId }?.nameAr ?: ""
+                                if (isArabic) activeReciter?.nameAr ?: "" else activeReciter?.nameEn ?: ""
+                            } else if (isArabic) {
+                                val maxStr = if (audio.repeatMode.maxPlays > 100) "∞" else QuranScriptFormatter.toArabicIndic(audio.repeatMode.maxPlays)
+                                "آية ${QuranScriptFormatter.toArabicIndic(audio.ayahNumber)} (${QuranScriptFormatter.toArabicIndic(audio.currentPlayCount)}/$maxStr)"
                             } else {
                                 "Ayah ${audio.ayahNumber} (${audio.currentPlayCount}/${if (audio.repeatMode.maxPlays > 100) "∞" else audio.repeatMode.maxPlays})"
                             },
                             style = MaterialTheme.typography.labelSmall,
-                            fontFamily = RobotoMonoFamily,
+                            fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily,
                             color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.8f)
                         )
                     }
@@ -265,21 +282,36 @@ fun QuranScreen(
                         FilterChip(
                             selected = true,
                             onClick = { viewModel.cycleRepeatMode() },
-                            label = { Text(audio.repeatMode.label, fontFamily = RobotoMonoFamily) },
+                            label = {
+                                Text(
+                                    text = if (isArabic) audio.repeatMode.labelAr else audio.repeatMode.label,
+                                    fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily
+                                )
+                            },
                             leadingIcon = { Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                     }
-                    IconButton(onClick = { viewModel.toggleAudioPlayPause() }) {
+                    IconButton(
+                        onClick = { viewModel.toggleAudioPlayPause() },
+                        modifier = Modifier.testTag("quran_audio_bar_play_pause")
+                    ) {
                         Icon(
                             imageVector = if (audio.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = "Play/Pause",
+                            contentDescription = if (audio.isPlaying) {
+                                if (isArabic) "إيقاف مؤقت" else "Pause"
+                            } else {
+                                if (isArabic) "متابعة" else "Continue"
+                            },
                             tint = MaterialTheme.colorScheme.inverseOnSurface
                         )
                     }
-                    IconButton(onClick = { viewModel.stopAudio() }) {
+                    IconButton(
+                        onClick = { viewModel.stopAudio() },
+                        modifier = Modifier.testTag("quran_audio_bar_stop")
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.Stop,
-                            contentDescription = "Stop",
+                            contentDescription = if (isArabic) "إيقاف" else "Stop",
                             tint = MaterialTheme.colorScheme.inverseOnSurface
                         )
                     }
@@ -329,7 +361,10 @@ private fun QuranBrowserView(
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Clear")
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = if (isArabic) "مسح" else "Clear"
+                            )
                         }
                     }
                 },
@@ -388,22 +423,27 @@ private fun QuranBrowserView(
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.openSurah(verse.surahNumber, verse.ayahNumber) }
+                                .clickable { viewModel.openMushafPage(verse.pageNumber) }
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
-                                    text = "${meta.nameEn} (${verse.surahNumber}:${verse.ayahNumber}) • ${strings.pageLabel} ${verse.pageNumber}",
+                                    text = if (isArabic) {
+                                        "سورة ${meta.nameAr} (${QuranScriptFormatter.toArabicIndic(verse.surahNumber)}:${QuranScriptFormatter.toArabicIndic(verse.ayahNumber)}) • ${strings.pageLabel} ${QuranScriptFormatter.toArabicIndic(verse.pageNumber)}"
+                                    } else {
+                                        "${meta.nameEn} (${verse.surahNumber}:${verse.ayahNumber}) • ${strings.pageLabel} ${verse.pageNumber}"
+                                    },
                                     style = MaterialTheme.typography.labelLarge,
+                                    fontFamily = if (isArabic) NotoSansArabicFamily else MaterialTheme.typography.labelLarge.fontFamily,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
                                     text = cleanSnippet,
-                                    fontFamily = AmiriFamily,
-                                    fontSize = 20.sp,
+                                    fontFamily = AmiriQuranFamily,
+                                    fontSize = 21.sp,
                                     textAlign = TextAlign.End,
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                if (verse.englishTranslation.isNotBlank()) {
+                                if (!isArabic && verse.englishTranslation.isNotBlank()) {
                                     Text(
                                         text = verse.englishTranslation,
                                         style = MaterialTheme.typography.bodySmall,
@@ -423,13 +463,18 @@ private fun QuranBrowserView(
                         ) {
                             // Continue Reading Hero Card
                             item {
-                                val lastMeta = QuranMetadata.surahByNumber(uiState.prefs.lastReadSurah)
+                                val resumePage = uiState.prefs.lastReadPage.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+                                val pageSurah = remember(resumePage, uiState.prefs.lastReadSurah) {
+                                    QuranMetadata.surahsOnPage(resumePage).firstOrNull()
+                                        ?: QuranMetadata.surahByNumber(uiState.prefs.lastReadSurah)
+                                }
+                                val resumeJuz = remember(resumePage) { QuranMetadata.juzForPage(resumePage).number }
                                 Card(
                                     shape = RoundedCornerShape(26.dp),
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { viewModel.openSurah(lastMeta.number, uiState.prefs.lastReadAyah) }
+                                        .clickable { viewModel.openMushafPage(resumePage) }
                                         .testTag("continue_reading_card")
                                 ) {
                                     Row(
@@ -457,15 +502,19 @@ private fun QuranBrowserView(
                                                 color = MaterialTheme.colorScheme.primary
                                             )
                                             Text(
-                                                text = if (isArabic) "سورة ${lastMeta.nameAr}" else "${lastMeta.nameEn} • ${lastMeta.nameAr}",
+                                                text = if (isArabic) "سورة ${pageSurah.nameAr}" else "${pageSurah.nameEn} • ${pageSurah.nameAr}",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontFamily = NotoSansArabicFamily,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
-                                                text = "Ayah ${uiState.prefs.lastReadAyah} • ${strings.pageLabel} ${lastMeta.startPage}",
+                                                text = if (isArabic) {
+                                                    "صفحة ${QuranScriptFormatter.toArabicIndic(resumePage)} • الجزء ${QuranScriptFormatter.toArabicIndic(resumeJuz)}"
+                                                } else {
+                                                    "${strings.pageLabel} $resumePage • Juz $resumeJuz"
+                                                },
                                                 style = MaterialTheme.typography.labelMedium,
-                                                fontFamily = RobotoMonoFamily
+                                                fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily
                                             )
                                         }
                                     }
@@ -487,14 +536,23 @@ private fun QuranBrowserView(
                                                 Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = EmeraldAligned)
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
-                                                    text = "${strings.offlineReady} (114 / 114)",
+                                                    text = if (isArabic) {
+                                                        "${strings.offlineReady} (١١٤ / ١١٤)"
+                                                    } else {
+                                                        "${strings.offlineReady} (114 / 114)"
+                                                    },
                                                     style = MaterialTheme.typography.labelLarge,
                                                     color = EmeraldAligned
                                                 )
                                             }
                                         } else if (dl != null && !dl.isFinished) {
                                             Text(
-                                                text = "${strings.downloadingQuran} ${dl.currentSurahName} (${dl.completedSurahs}/114)",
+                                                text = if (isArabic) {
+                                                    val sAr = QuranMetadata.surahByNumber(dl.completedSurahs.coerceIn(1, 114)).nameAr
+                                                    "${strings.downloadingQuran} $sAr (${QuranScriptFormatter.toArabicIndic(dl.completedSurahs)}/١١٤)"
+                                                } else {
+                                                    "${strings.downloadingQuran} ${dl.currentSurahName} (${dl.completedSurahs}/114)"
+                                                },
                                                 style = MaterialTheme.typography.labelMedium
                                             )
                                             Spacer(modifier = Modifier.height(8.dp))
@@ -512,11 +570,17 @@ private fun QuranBrowserView(
                                             ) {
                                                 Icon(Icons.Filled.CloudDownload, contentDescription = null)
                                                 Spacer(modifier = Modifier.width(8.dp))
-                                                Text("${strings.downloadFullQuran} (${uiState.cachedSurahs.size}/114)")
+                                                Text(
+                                                    if (isArabic) {
+                                                        "${strings.downloadFullQuran} (${QuranScriptFormatter.toArabicIndic(uiState.cachedSurahs.size)}/١١٤)"
+                                                    } else {
+                                                        "${strings.downloadFullQuran} (${uiState.cachedSurahs.size}/114)"
+                                                    }
+                                                )
                                             }
                                             if (dl?.error != null) {
                                                 Text(
-                                                    text = dl.error,
+                                                    text = if (isArabic) "تعذّر التحميل، يرجى التحقق من الاتصال" else dl.error,
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.error,
                                                     modifier = Modifier.padding(top = 4.dp)
@@ -534,7 +598,7 @@ private fun QuranBrowserView(
                                     color = MaterialTheme.colorScheme.surfaceContainer,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { viewModel.openSurah(surah.number) }
+                                        .clickable { viewModel.openMushafPage(surah.startPage) }
                                         .testTag("surah_item_${surah.number}")
                                 ) {
                                     Row(
@@ -548,9 +612,14 @@ private fun QuranBrowserView(
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = "${surah.number}",
+                                                    text = if (isArabic) {
+                                                        QuranScriptFormatter.toArabicIndic(surah.number)
+                                                    } else {
+                                                        "${surah.number}"
+                                                    },
                                                     style = MaterialTheme.typography.labelLarge,
-                                                    fontFamily = RobotoMonoFamily,
+                                                    fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily,
+                                                    fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                                 )
                                             }
@@ -558,12 +627,19 @@ private fun QuranBrowserView(
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = surah.nameEn,
-                                                style = MaterialTheme.typography.titleMedium
+                                                text = if (isArabic) "سورة ${surah.nameAr}" else surah.nameEn,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontFamily = if (isArabic) AmiriQuranFamily else MaterialTheme.typography.titleMedium.fontFamily,
+                                                fontSize = if (isArabic) 20.sp else 16.sp
                                             )
                                             Text(
-                                                text = "${if (surah.isMakkan) strings.makkan else strings.madinan} • ${surah.ayahCount} ${strings.versesLabel} • ${strings.pageLabel} ${surah.startPage}",
+                                                text = if (isArabic) {
+                                                    "${if (surah.isMakkan) strings.makkan else strings.madinan} • ${QuranScriptFormatter.toArabicIndic(surah.ayahCount)} ${strings.versesLabel} • ${strings.pageLabel} ${QuranScriptFormatter.toArabicIndic(surah.startPage)}"
+                                                } else {
+                                                    "${if (surah.isMakkan) strings.makkan else strings.madinan} • ${surah.ayahCount} ${strings.versesLabel} • ${strings.pageLabel} ${surah.startPage}"
+                                                },
                                                 style = MaterialTheme.typography.bodySmall,
+                                                fontFamily = if (isArabic) NotoSansArabicFamily else MaterialTheme.typography.bodySmall.fontFamily,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -577,13 +653,23 @@ private fun QuranBrowserView(
                                                     .size(16.dp)
                                             )
                                         }
-                                        Text(
-                                            text = surah.nameAr,
-                                            fontFamily = NotoSansArabicFamily,
-                                            fontSize = 19.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
+                                        if (isArabic) {
+                                            Text(
+                                                text = "ص ${QuranScriptFormatter.toArabicIndic(surah.startPage)}",
+                                                fontFamily = NotoSansArabicFamily,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        } else {
+                                            Text(
+                                                text = surah.nameAr,
+                                                fontFamily = AmiriQuranFamily,
+                                                fontSize = 21.sp,
+                                                fontWeight = FontWeight.Normal,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -617,9 +703,13 @@ private fun QuranBrowserView(
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
                                         Text(
-                                            text = "${strings.juzTab} ${juz.number} • ${strings.pageLabel} ${juz.startPage}",
+                                            text = if (isArabic) {
+                                                "${strings.juzTab} ${QuranScriptFormatter.toArabicIndic(juz.number)} • ${strings.pageLabel} ${QuranScriptFormatter.toArabicIndic(juz.startPage)}"
+                                            } else {
+                                                "${strings.juzTab} ${juz.number} • ${strings.pageLabel} ${juz.startPage}"
+                                            },
                                             style = MaterialTheme.typography.labelLarge,
-                                            fontFamily = RobotoMonoFamily,
+                                            fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                         Text(
@@ -629,8 +719,13 @@ private fun QuranBrowserView(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = "${surah.nameEn} : ${juz.startAyah}",
+                                            text = if (isArabic) {
+                                                "سورة ${surah.nameAr} : ${QuranScriptFormatter.toArabicIndic(juz.startAyah)}"
+                                            } else {
+                                                "${surah.nameEn} : ${juz.startAyah}"
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
+                                            fontFamily = if (isArabic) NotoSansArabicFamily else MaterialTheme.typography.bodySmall.fontFamily,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -659,12 +754,31 @@ private fun QuranBrowserView(
                                 contentPadding = PaddingValues(bottom = 84.dp)
                             ) {
                                 items(uiState.bookmarks, key = { it.id }) { bm ->
+                                    val isPageBookmark = bm.surahNumber == 0
+                                    val targetPage = if (isPageBookmark) {
+                                        bm.ayahNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+                                    } else {
+                                        QuranMetadata.surahByNumber(bm.surahNumber).startPage
+                                    }
+                                    val pageSurahs = QuranMetadata.surahsOnPage(targetPage)
+                                    val bmSurahMeta = if (isPageBookmark) {
+                                        pageSurahs.firstOrNull() ?: QuranMetadata.surahByNumber(1)
+                                    } else {
+                                        QuranMetadata.surahByNumber(bm.surahNumber)
+                                    }
                                     Surface(
                                         shape = RoundedCornerShape(20.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainer,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable { viewModel.openSurah(bm.surahNumber, bm.ayahNumber) }
+                                            .clickable {
+                                                if (isPageBookmark) {
+                                                    viewModel.openMushafPage(targetPage)
+                                                } else {
+                                                    viewModel.openSurah(bm.surahNumber, bm.ayahNumber)
+                                                }
+                                            }
+                                            .testTag("bookmark_item_${bm.surahNumber}_${bm.ayahNumber}")
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(14.dp),
@@ -672,20 +786,34 @@ private fun QuranBrowserView(
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "${bm.surahNameEn} • ${bm.surahNumber}:${bm.ayahNumber}",
+                                                    text = if (isPageBookmark) {
+                                                        if (isArabic) {
+                                                            "صفحة ${QuranScriptFormatter.toArabicIndic(targetPage)} • سورة ${bmSurahMeta.nameAr}"
+                                                        } else {
+                                                            "Page $targetPage • ${bmSurahMeta.nameEn}"
+                                                        }
+                                                    } else if (isArabic) {
+                                                        "سورة ${bmSurahMeta.nameAr} • ${QuranScriptFormatter.toArabicIndic(bm.surahNumber)}:${QuranScriptFormatter.toArabicIndic(bm.ayahNumber)}"
+                                                    } else {
+                                                        "${bm.surahNameEn} • ${bm.surahNumber}:${bm.ayahNumber}"
+                                                    },
                                                     style = MaterialTheme.typography.titleSmall,
+                                                    fontFamily = if (isArabic) NotoSansArabicFamily else MaterialTheme.typography.titleSmall.fontFamily,
                                                     color = MaterialTheme.colorScheme.primary
                                                 )
                                                 Text(
                                                     text = bm.arabicSnippet,
-                                                    fontFamily = AmiriFamily,
-                                                    fontSize = 19.sp,
+                                                    fontFamily = AmiriQuranFamily,
+                                                    fontSize = 18.sp,
                                                     maxLines = 2,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                             IconButton(onClick = { viewModel.removeBookmark(bm) }) {
-                                                Icon(Icons.Filled.Delete, contentDescription = "Remove bookmark")
+                                                Icon(
+                                                    imageVector = Icons.Filled.Delete,
+                                                    contentDescription = if (isArabic) "حذف الإشارة" else "Remove bookmark"
+                                                )
                                             }
                                         }
                                     }
@@ -742,7 +870,11 @@ private fun MushafPagesBrowserGrid(
                         OutlinedTextField(
                             value = pageInput,
                             onValueChange = { pageInput = it.filter { ch -> ch.isDigit() }.take(3) },
-                            label = { Text("${strings.pageLabel} (1–604)") },
+                            label = {
+                                Text(
+                                    if (isArabic) "${strings.pageLabel} (١–٦٠٤)" else "${strings.pageLabel} (1–604)"
+                                )
+                            },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier
@@ -757,7 +889,7 @@ private fun MushafPagesBrowserGrid(
                             shape = CircleShape,
                             modifier = Modifier.testTag("mushaf_page_go_button")
                         ) {
-                            Text("Go")
+                            Text(if (isArabic) "انتقال" else "Go")
                         }
                     }
                     Row(
@@ -768,7 +900,14 @@ private fun MushafPagesBrowserGrid(
                             AssistChip(
                                 onClick = { viewModel.openMushafPage(sp) },
                                 label = {
-                                    Text("${strings.pageLabel} $sp", fontFamily = RobotoMonoFamily)
+                                    Text(
+                                        text = if (isArabic) {
+                                            "${strings.pageLabel} ${QuranScriptFormatter.toArabicIndic(sp)}"
+                                        } else {
+                                            "${strings.pageLabel} $sp"
+                                        },
+                                        fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily
+                                    )
                                 },
                                 modifier = Modifier.testTag("mushaf_quick_page_$sp")
                             )
@@ -799,7 +938,7 @@ private fun MushafPagesBrowserGrid(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (isArabic) {
-                                    "ختمة القرآن • ${khatmah.completedPagesCount} / 604 صفحة"
+                                    "ختمة القرآن • ${QuranScriptFormatter.toArabicIndic(khatmah.completedPagesCount)} / ٦٠٤ صفحة"
                                 } else {
                                     "Khatmah Progress • ${khatmah.completedPagesCount} / 604 Pages"
                                 },
@@ -810,7 +949,7 @@ private fun MushafPagesBrowserGrid(
                             )
                             Text(
                                 text = if (isArabic) {
-                                    "الورد اليومي: ${khatmah.dailyPagesGoal} صفحة (${khatmah.targetDays} يوماً)"
+                                    "الورد اليومي: ${QuranScriptFormatter.toArabicIndic(khatmah.dailyPagesGoal)} صفحة (${QuranScriptFormatter.toArabicIndic(khatmah.targetDays)} يوماً)"
                                 } else {
                                     "Daily goal: ${khatmah.dailyPagesGoal} pages/day (${khatmah.targetDays}-day plan)"
                                 },
@@ -826,8 +965,12 @@ private fun MushafPagesBrowserGrid(
                             modifier = Modifier.testTag("khatmah_continue_button")
                         ) {
                             Text(
-                                text = if (isArabic) "صفحة ${khatmah.nextUnreadPage}" else "Page ${khatmah.nextUnreadPage}",
-                                fontFamily = RobotoMonoFamily,
+                                text = if (isArabic) {
+                                    "صفحة ${QuranScriptFormatter.toArabicIndic(khatmah.nextUnreadPage)}"
+                                } else {
+                                    "Page ${khatmah.nextUnreadPage}"
+                                },
+                                fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily,
                                 style = MaterialTheme.typography.labelMedium
                             )
                         }
@@ -849,8 +992,8 @@ private fun MushafPagesBrowserGrid(
                                 onClick = { viewModel.setKhatmahTargetDays(days) },
                                 label = {
                                     Text(
-                                        text = if (isArabic) "$days يوم" else "${days}d",
-                                        fontFamily = RobotoMonoFamily
+                                        text = if (isArabic) "${QuranScriptFormatter.toArabicIndic(days)} يوم" else "${days}d",
+                                        fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily
                                     )
                                 }
                             )
@@ -889,16 +1032,16 @@ private fun MushafPagesBrowserGrid(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "$pageNum",
+                            text = if (isArabic) QuranScriptFormatter.toArabicIndic(pageNum) else "$pageNum",
                             style = MaterialTheme.typography.titleMedium,
-                            fontFamily = RobotoMonoFamily,
+                            fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily,
                             fontWeight = FontWeight.Bold,
                             color = if (isPageRead) EmeraldAligned else MaterialTheme.colorScheme.primary
                         )
                         if (isPageRead) {
                             Icon(
                                 imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = "Read",
+                                contentDescription = if (isArabic) "مقروءة" else "Read",
                                 tint = EmeraldAligned,
                                 modifier = Modifier.size(13.dp)
                             )
@@ -913,8 +1056,12 @@ private fun MushafPagesBrowserGrid(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "J$juzNum • H$hizbNum",
-                        fontFamily = RobotoMonoFamily,
+                        text = if (isArabic) {
+                            "ج${QuranScriptFormatter.toArabicIndic(juzNum)} • ح${QuranScriptFormatter.toArabicIndic(hizbNum)}"
+                        } else {
+                            "J$juzNum • H$hizbNum"
+                        },
+                        fontFamily = if (isArabic) NotoSansArabicFamily else RobotoMonoFamily,
                         fontSize = 9.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                     )

@@ -6,8 +6,14 @@ import com.example.data.azkar.AzkarRepository
 import com.example.data.local.AppDatabase
 import com.example.data.prayer.PrayerTrackerRepository
 import com.example.data.preferences.UserPreferencesDataStore
+import com.example.data.quran.QuranComLineRepository
+import com.example.data.quran.QuranComTafsirApi
+import com.example.data.quran.QuranComV4Api
+import com.example.data.quran.QuranFlashPageRepository
 import com.example.data.quran.QuranRemoteApi
 import com.example.data.quran.QuranRepository
+import com.example.data.quran.QuranTafseerMirrorApi
+import com.example.data.quran.QuranTafsirRepository
 import com.example.data.weather.WeatherApi
 import com.example.data.weather.WeatherRepository
 import com.example.sensors.QiblaSensorManager
@@ -53,6 +59,31 @@ class AppContainer(context: Context) {
             .create(QuranRemoteApi::class.java)
     }
 
+    private val quranComV4Retrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://api.quran.com/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+    }
+
+    private val quranComV4Api: QuranComV4Api by lazy {
+        quranComV4Retrofit.create(QuranComV4Api::class.java)
+    }
+
+    private val quranComTafsirApi: QuranComTafsirApi by lazy {
+        quranComV4Retrofit.create(QuranComTafsirApi::class.java)
+    }
+
+    private val quranTafseerMirrorApi: QuranTafseerMirrorApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://api.quran-tafseer.com/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(QuranTafseerMirrorApi::class.java)
+    }
+
     private val weatherApi: WeatherApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://api.open-meteo.com/")
@@ -66,8 +97,20 @@ class AppContainer(context: Context) {
         UserPreferencesDataStore(appContext)
     }
 
+    val quranComLineRepository: QuranComLineRepository by lazy {
+        QuranComLineRepository(appContext, quranComV4Api, moshi)
+    }
+
+    val quranTafsirRepository: QuranTafsirRepository by lazy {
+        QuranTafsirRepository(appContext, quranComTafsirApi, quranTafseerMirrorApi)
+    }
+
+    val quranFlashPageRepository: QuranFlashPageRepository by lazy {
+        QuranFlashPageRepository(appContext, okHttpClient)
+    }
+
     val quranRepository: QuranRepository by lazy {
-        QuranRepository(database.quranDao(), database.bookmarkDao(), quranApi)
+        QuranRepository(database.quranDao(), database.bookmarkDao(), quranApi, quranComLineRepository)
     }
 
     val azkarRepository: AzkarRepository by lazy {

@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 enum class AzkarCategory {
-    MORNING, EVENING, AFTER_PRAYER, SLEEP_AND_DAILY, GENERAL
+    MORNING, EVENING, AFTER_PRAYER, SLEEP_AND_DAILY, GENERAL, WAKING_UP, MOSQUE_AND_HOME
 }
 
 data class AzkarItem(
@@ -20,7 +20,10 @@ data class AzkarItem(
     val translationEn: String,
     val referenceEn: String,
     val referenceAr: String,
-    val repeatTarget: Int
+    val repeatTarget: Int,
+    val titleAr: String = "",
+    val titleEn: String = "",
+    val fadlAr: String = ""
 )
 
 data class TasbeehPreset(

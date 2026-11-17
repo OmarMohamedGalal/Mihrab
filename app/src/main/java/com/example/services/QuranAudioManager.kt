@@ -23,20 +23,21 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.random.Random
 
-enum class RepeatMode(val label: String, val maxPlays: Int) {
-    ONCE("1x", 1),
-    TWICE("2x", 2),
-    THREE("3x", 3),
-    FIVE("5x", 5),
-    INFINITE("∞", Int.MAX_VALUE)
+enum class RepeatMode(val label: String, val labelAr: String, val maxPlays: Int) {
+    ONCE("1x", "مرة", 1),
+    TWICE("2x", "مرتان", 2),
+    THREE("3x", "٣ مرات", 3),
+    FIVE("5x", "٥ مرات", 5),
+    INFINITE("∞", "مستمر", Int.MAX_VALUE)
 }
 
 data class QuranAudioState(
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
+    val isPaused: Boolean = false,
     val isFullSurahMode: Boolean = false,
     val isOfflinePlayback: Boolean = false,
-    val reciterId: String = "ar.islamsobhi",
+    val reciterId: String = "ar.husary",
     val surahNumber: Int = 0,
     val ayahNumber: Int = 0,
     val globalAyahNumber: Int = 0,
@@ -67,12 +68,14 @@ class QuranAudioManager(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var mediaPlayer: MediaPlayer? = null
     private var progressJob: Job? = null
+    private var isPrepared: Boolean = false
+    private var pauseRequestedWhileBuffering: Boolean = false
 
     private val _state = MutableStateFlow(QuranAudioState())
     val state: StateFlow<QuranAudioState> = _state.asStateFlow()
 
     private var activePlaylist: List<Pair<Int, Int>> = emptyList() // (ayahNumber, globalNumber)
-    private var activeReciterId: String = "ar.islamsobhi"
+    private var activeReciterId: String = "ar.husary"
 
     init {
         refreshDownloadedFiles()
@@ -171,7 +174,6 @@ class QuranAudioManager(
         val validSurah = surahNumber.coerceIn(1, 114)
         activeReciterId = reciterId
         startFullSurahPlayback(validSurah, reciterId, playIteration = 1, allowFallback = true)
-        notifyWidgetUpdate()
     }
 
     fun nextTrack() {
@@ -221,23 +223,63 @@ class QuranAudioManager(
             }
             return
         }
-        runCatching {
-            if (player.isPlaying) {
-                player.pause()
-                stopProgressPoller()
-                _state.update { it.copy(isPlaying = false) }
+
+        // If still buffering (onPrepared hasn't fired yet), toggle requested pause cleanly
+        if (!isPrepared) {
+            if (cur.isBuffering || !cur.isPaused) {
+                pauseRequestedWhileBuffering = true
+                _state.update { it.copy(isPlaying = false, isBuffering = false, isPaused = true) }
             } else {
+                pauseRequestedWhileBuffering = false
+                _state.update { it.copy(isPlaying = false, isBuffering = true, isPaused = false) }
+            }
+            context?.let { QuranPlaybackService.sync(it) }
+            return
+        }
+
+        val actuallyPlaying = runCatching { player.isPlaying }.getOrDefault(cur.isPlaying)
+        if (actuallyPlaying || cur.isPlaying) {
+            val pauseOk = runCatching {
+                val pos = runCatching { player.currentPosition.toLong().coerceAtLeast(0L) }.getOrDefault(cur.positionMs)
+                if (player.isPlaying) player.pause()
+                pos
+            }
+            stopProgressPoller()
+            val pos = pauseOk.getOrDefault(cur.positionMs)
+            _state.update {
+                it.copy(
+                    isPlaying = false,
+                    isBuffering = false,
+                    isPaused = true,
+                    positionMs = pos
+                )
+            }
+        } else {
+            val resumeResult = runCatching {
                 player.start()
+            }
+            if (resumeResult.isSuccess) {
                 startProgressPoller()
-                _state.update { it.copy(isPlaying = true) }
+                _state.update {
+                    it.copy(
+                        isPlaying = true,
+                        isBuffering = false,
+                        isPaused = false,
+                        errorMessage = null
+                    )
+                }
+            } else if (cur.surahNumber > 0) {
+                playSurah(cur.surahNumber, cur.reciterId.ifBlank { activeReciterId })
+                return
             }
         }
         context?.let { QuranPlaybackService.sync(it) }
-        notifyWidgetUpdate()
     }
 
     fun stop() {
         stopProgressPoller()
+        isPrepared = false
+        pauseRequestedWhileBuffering = false
         runCatching {
             mediaPlayer?.let {
                 if (it.isPlaying) it.stop()
@@ -249,6 +291,7 @@ class QuranAudioManager(
             it.copy(
                 isPlaying = false,
                 isBuffering = false,
+                isPaused = false,
                 surahNumber = 0,
                 ayahNumber = 0,
                 globalAyahNumber = 0,
@@ -259,14 +302,6 @@ class QuranAudioManager(
             )
         }
         context?.let { QuranPlaybackService.stop(it) }
-        notifyWidgetUpdate()
-    }
-
-    private fun notifyWidgetUpdate() {
-        val ctx = context ?: return
-        scope.launch(Dispatchers.IO) {
-            runCatching { com.example.widgets.WidgetUpdater.updateAll(ctx) }
-        }
     }
 
     fun downloadSurahForOffline(surahNumber: Int, reciterId: String) {
@@ -362,6 +397,8 @@ class QuranAudioManager(
         allowFallback: Boolean
     ) {
         stopProgressPoller()
+        isPrepared = false
+        pauseRequestedWhileBuffering = false
         runCatching { mediaPlayer?.release() }
         mediaPlayer = null
 
@@ -380,6 +417,7 @@ class QuranAudioManager(
             it.copy(
                 isPlaying = false,
                 isBuffering = true,
+                isPaused = false,
                 isFullSurahMode = true,
                 isOfflinePlayback = isLocalReady,
                 reciterId = reciterId,
@@ -409,17 +447,31 @@ class QuranAudioManager(
             setVolume(vol, vol)
 
             setOnPreparedListener { mp ->
+                isPrepared = true
                 val dur = runCatching { mp.duration.toLong().coerceAtLeast(0L) }.getOrDefault(0L)
-                mp.start()
-                _state.update {
-                    it.copy(
-                        isPlaying = true,
-                        isBuffering = false,
-                        durationMs = dur,
-                        positionMs = 0L
-                    )
+                if (pauseRequestedWhileBuffering) {
+                    _state.update {
+                        it.copy(
+                            isPlaying = false,
+                            isBuffering = false,
+                            isPaused = true,
+                            durationMs = dur,
+                            positionMs = 0L
+                        )
+                    }
+                } else {
+                    mp.start()
+                    _state.update {
+                        it.copy(
+                            isPlaying = true,
+                            isBuffering = false,
+                            isPaused = false,
+                            durationMs = dur,
+                            positionMs = 0L
+                        )
+                    }
+                    startProgressPoller()
                 }
-                startProgressPoller()
                 context?.let { QuranPlaybackService.sync(it) }
             }
 
@@ -465,22 +517,60 @@ class QuranAudioManager(
         }
     }
 
+    private fun everyAyahFallbackUrl(reciterId: String, surahNumber: Int, ayahNumber: Int): String? {
+        val folder = when (reciterId) {
+            "ar.husary" -> "Husary_128kbps"
+            "ar.husarymujawwad" -> "Husary_Mujawwad_128kbps"
+            "ar.alafasy" -> "Alafasy_128kbps"
+            "ar.abdulbasitmurattal" -> "Abdul_Basit_Murattal_192kbps"
+            "ar.abdulbasitmujawwad" -> "Abdul_Basit_Mujawwad_128kbps"
+            "ar.minshawi" -> "Minshawy_Murattal_128kbps"
+            "ar.minshawimujawwad" -> "Minshawy_Mujawwad_192kbps"
+            "ar.abdurrahmaansudais" -> "Abdurrahmaan_As-Sudais_192kbps"
+            "ar.saoodshuraym" -> "Saood_ash-Shuraym_128kbps"
+            "ar.mahermuaiqly" -> "MaherAlMuaiqly128kbps"
+            "ar.hudhaify" -> "Hudhaify_128kbps"
+            "ar.muhammadayyoub" -> "Muhammad_Ayyoub_128kbps"
+            "ar.shaatree" -> "Abu_Bakr_Ash-Shaatree_128kbps"
+            else -> "Husary_128kbps"
+        }
+        val sss = String.format(java.util.Locale.US, "%03d", surahNumber.coerceIn(1, 114))
+        val aaa = String.format(java.util.Locale.US, "%03d", ayahNumber.coerceIn(1, 286))
+        return "https://everyayah.com/data/$folder/$sss$aaa.mp3"
+    }
+
     private fun startVerseStream(
         surahNumber: Int,
         ayahNumber: Int,
         globalNumber: Int,
-        playIteration: Int
+        playIteration: Int,
+        allowBackupUrl: Boolean = true
     ) {
         stopProgressPoller()
+        isPrepared = false
+        pauseRequestedWhileBuffering = false
         runCatching { mediaPlayer?.release() }
         mediaPlayer = null
 
         val reciter = QuranRecitersCatalog.reciterById(activeReciterId)
-        val url = "https://cdn.islamic.network/quran/audio/128/${reciter.ayahEditionId}/$globalNumber.mp3"
+        val primaryUrl = if (activeReciterId == "ar.husary") {
+            everyAyahFallbackUrl("ar.husary", surahNumber, ayahNumber)
+                ?: "https://cdn.islamic.network/quran/audio/128/${reciter.ayahEditionId}/$globalNumber.mp3"
+        } else {
+            "https://cdn.islamic.network/quran/audio/128/${reciter.ayahEditionId}/$globalNumber.mp3"
+        }
+        val backupUrl = if (activeReciterId == "ar.husary") {
+            "https://cdn.islamic.network/quran/audio/128/${reciter.ayahEditionId}/$globalNumber.mp3"
+        } else {
+            everyAyahFallbackUrl(activeReciterId, surahNumber, ayahNumber)
+        }
+        val url = if (allowBackupUrl) primaryUrl else (backupUrl ?: primaryUrl)
+
         _state.update {
             it.copy(
                 isPlaying = false,
                 isBuffering = true,
+                isPaused = false,
                 isFullSurahMode = false,
                 isOfflinePlayback = false,
                 reciterId = activeReciterId,
@@ -509,22 +599,35 @@ class QuranAudioManager(
             setVolume(vol, vol)
 
             setOnPreparedListener { mp ->
+                isPrepared = true
                 val dur = runCatching { mp.duration.toLong().coerceAtLeast(0L) }.getOrDefault(0L)
-                mp.start()
-                _state.update {
-                    it.copy(
-                        isPlaying = true,
-                        isBuffering = false,
-                        durationMs = dur
-                    )
+                if (pauseRequestedWhileBuffering) {
+                    _state.update {
+                        it.copy(
+                            isPlaying = false,
+                            isBuffering = false,
+                            isPaused = true,
+                            durationMs = dur
+                        )
+                    }
+                } else {
+                    mp.start()
+                    _state.update {
+                        it.copy(
+                            isPlaying = true,
+                            isBuffering = false,
+                            isPaused = false,
+                            durationMs = dur
+                        )
+                    }
+                    startProgressPoller()
                 }
-                startProgressPoller()
                 context?.let { QuranPlaybackService.sync(it) }
             }
             setOnCompletionListener {
                 val mode = _state.value.repeatMode
                 if (playIteration < mode.maxPlays) {
-                    startVerseStream(surahNumber, ayahNumber, globalNumber, playIteration + 1)
+                    startVerseStream(surahNumber, ayahNumber, globalNumber, playIteration + 1, allowBackupUrl = true)
                 } else {
                     val idx = activePlaylist.indexOfFirst { it.first == ayahNumber }
                     val nextPair = if (idx >= 0 && idx + 1 < activePlaylist.size) {
@@ -532,20 +635,24 @@ class QuranAudioManager(
                     } else null
 
                     if (nextPair != null) {
-                        startVerseStream(surahNumber, nextPair.first, nextPair.second, 1)
+                        startVerseStream(surahNumber, nextPair.first, nextPair.second, 1, allowBackupUrl = true)
                     } else {
                         stop()
                     }
                 }
             }
             setOnErrorListener { _, _, _ ->
-                stopProgressPoller()
-                _state.update {
-                    it.copy(
-                        isPlaying = false,
-                        isBuffering = false,
-                        errorMessage = "Audio unavailable offline"
-                    )
+                if (allowBackupUrl && backupUrl != null && backupUrl != primaryUrl) {
+                    startVerseStream(surahNumber, ayahNumber, globalNumber, playIteration, allowBackupUrl = false)
+                } else {
+                    stopProgressPoller()
+                    _state.update {
+                        it.copy(
+                            isPlaying = false,
+                            isBuffering = false,
+                            errorMessage = "Audio unavailable offline"
+                        )
+                    }
                 }
                 true
             }

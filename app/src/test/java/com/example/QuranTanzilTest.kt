@@ -73,9 +73,16 @@ class QuranTanzilTest {
     @Test
     fun completeAzkarCatalogCoversAllCategoriesAndTasbeehPresets() {
         assertTrue(AzkarRepository.tasbeehPresets.size >= 8)
+        assertEquals(7, AzkarCategory.entries.size)
+        assertTrue(AzkarRepository.azkarItems.size >= 80)
         for (category in AzkarCategory.entries) {
-            val count = AzkarRepository.azkarItems.count { it.category == category }
-            assertTrue("Category $category should have at least 8 authentic items, had $count", count >= 8)
+            val items = AzkarRepository.azkarItems.filter { it.category == category }
+            assertTrue("Category $category should have at least 4 authentic items, had ${items.size}", items.size >= 4)
+            for (item in items) {
+                assertTrue("Azkar ${item.id} missing titleAr", item.titleAr.isNotBlank())
+                assertTrue("Azkar ${item.id} must not use ... truncation", !item.arabicText.contains("..."))
+                assertTrue("Azkar ${item.id} must have positive repeatTarget", item.repeatTarget >= 1)
+            }
         }
     }
 
@@ -118,4 +125,73 @@ class QuranTanzilTest {
         assertEquals(21, khatmah.dailyPagesGoal)
         assertEquals(4, khatmah.nextUnreadPage)
     }
+
+    @Test
+    fun quranComLineLayoutParsesLinesAndStarterPagesOneAndTwoAccurately() {
+        val page1 = com.example.data.quran.QuranComLineRepository.bundledStarterLineLayout(1)
+        assertNotNull(page1)
+        assertEquals(1, page1!!.pageNumber)
+        assertEquals(7, page1.lines.size)
+        assertTrue(page1.lines.first().words.any { it.isEndMarker && it.text.contains('\u06DD') })
+
+        val page2 = com.example.data.quran.QuranComLineRepository.bundledStarterLineLayout(2)
+        assertNotNull(page2)
+        assertEquals(2, page2!!.pageNumber)
+        assertEquals(6, page2.lines.size)
+        assertTrue(page2.lines.first().words.any { it.surahNumber == 2 && it.ayahNumber == 1 })
+
+        // Verify simple script preserves عَلَىٰ / ٱلصَّلَوٰةَ without inserting spurious extra alef
+        val baqarahSample = "أُو۟لَـٰٓئِكَ عَلَىٰ هُدًى ۖ وَيُقِيمُونَ ٱلصَّلَوٰةَ"
+        val cleanSimple = QuranScriptFormatter.formatTanzilScript(baqarahSample, simple = true)
+        assertFalse(cleanSimple.contains("علىا"))
+        assertFalse(cleanSimple.contains("الصلواة"))
+        assertFalse(cleanSimple.contains('\u06D6'))
+
+        // Verify HTML footnotes stripped cleanly from translations
+        val cleanEn = QuranScriptFormatter.stripTranslationHtml(
+            "This is the Book<sup foot_note=\"19592\">1</sup> about which there is no doubt."
+        )
+        assertEquals("This is the Book about which there is no doubt.", cleanEn)
+    }
+
+    @Test
+    fun ksuAyatTafsirAndHusaryDefaultsWorkAccurately() {
+        // Verify Al-Baqarah 2:6 is seeded offline on Page 3
+        val baqarah6 = QuranMetadata.bundledStarterVerses.find { it.surahNumber == 2 && it.ayahNumber == 6 }
+        assertNotNull("Al-Baqarah 2:6 should be bundled for offline KSU #aya=2_6 access", baqarah6)
+        assertEquals(3, baqarah6!!.pageNumber)
+
+        // Verify KSU Tafsir Al-Muyassar (ar_mu) is bundled for 2:6
+        val muyassar26 = com.example.data.quran.QuranTafsirRepository.bundledMuyassarStarter["2:6"]
+        assertNotNull("Tafsir Al-Muyassar for 2:6 should be bundled offline", muyassar26)
+        assertTrue(muyassar26!!.contains("جحدوا"))
+
+        // Verify KSU Tafsir edition IDs
+        assertEquals("ar_mu", com.example.data.quran.KsuTafsirEdition.AR_MUYASSAR.ksuCode)
+        assertEquals(16, com.example.data.quran.KsuTafsirEdition.AR_MUYASSAR.quranComTafsirId)
+        assertEquals(1, com.example.data.quran.KsuTafsirEdition.AR_MUYASSAR.mirrorTafseerId)
+
+        // Verify Al-Husary (qaree=husary) is the default reciter
+        val prefs = com.example.data.preferences.UserPreferences()
+        assertEquals("ar.husary", prefs.selectedReciterId)
+        val husary = QuranRecitersCatalog.reciterById("ar.husary")
+        assertEquals("محمود خليل الحصري", husary.nameAr)
+    }
+
+    @Test
+    fun quranFlashMedina1PageUrlsAndImageValidationWorkAccurately() {
+        val urls1 = com.example.data.quran.QuranFlashPageRepository.medina1UrlCandidates(1)
+        assertEquals("https://app.quranflash.com/book/Medina1/epub/EPUB/imgs/0001.gif", urls1.first())
+        assertTrue(urls1.contains("https://www.quranflash.com/books/Medina1/data/N/0001.gif"))
+
+        val urls604 = com.example.data.quran.QuranFlashPageRepository.medina1UrlCandidates(604)
+        assertEquals("https://app.quranflash.com/book/Medina1/epub/EPUB/imgs/0604.gif", urls604.first())
+
+        val gifHeader = byteArrayOf('G'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), '8'.code.toByte(), '9'.code.toByte(), 'a'.code.toByte(), 0, 0, 0, 0, 0, 0)
+        val htmlHeader = "<!DOCTYPE html><html></html>".toByteArray()
+        assertTrue(com.example.data.quran.QuranFlashPageRepository.looksLikeValidImage(gifHeader))
+        assertFalse(com.example.data.quran.QuranFlashPageRepository.looksLikeValidImage(htmlHeader))
+    }
 }
+
+

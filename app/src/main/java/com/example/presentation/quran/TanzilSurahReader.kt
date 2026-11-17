@@ -1,8 +1,10 @@
 package com.example.presentation.quran
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -13,40 +15,40 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -55,30 +57,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.i18n.AppLanguage
 import com.example.core.i18n.LocalStrings
-import com.example.data.local.QuranVerseEntity
 import com.example.data.quran.QuranMetadata
+import com.example.data.quran.QuranRecitersCatalog
 import com.example.data.quran.QuranScriptFormatter
-import com.example.ui.theme.AmiriFamily
 import com.example.ui.theme.NotoSansArabicFamily
-import com.example.ui.theme.RobotoMonoFamily
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,574 +95,590 @@ fun TanzilSurahReaderView(
     val strings = LocalStrings.current
     val isArabic = strings.language == AppLanguage.ARABIC
     val prefs = uiState.prefs
-    val nightMode = prefs.quranNightMode
-    val isMushafMode = prefs.quranMushafMode
-    val isSimpleScript = prefs.quranSimpleScript
-    val tajweedEnabled = uiState.tajweedEnabled
-    val isPageMode = mushafPage != null
+    val readingTheme = uiState.readingTheme
+    val fontStyle = uiState.fontStyle
+    val scope = rememberCoroutineScope()
 
-    val palette = remember(nightMode) { rememberMushafPalette(nightMode) }
-
+    val palette = rememberMushafPalette(readingTheme)
     val verses = uiState.currentSurahVerses
-    val activePage = mushafPage
-        ?: verses.firstOrNull()?.pageNumber
-        ?: QuranMetadata.surahByNumber(surahNumber ?: 1).startPage
-    val primarySurahNumber = surahNumber
-        ?: verses.firstOrNull()?.surahNumber
-        ?: QuranMetadata.surahsOnPage(activePage).firstOrNull()?.number
-        ?: 1
-    val surahMeta = QuranMetadata.surahByNumber(primarySurahNumber)
+    val initialBookPage = (
+        mushafPage
+            ?: verses.firstOrNull()?.pageNumber
+            ?: QuranMetadata.surahByNumber(surahNumber ?: 1).startPage
+        ).coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+
+    val pagerState = rememberPagerState(
+        initialPage = initialBookPage - 1,
+        pageCount = { QuranMetadata.TOTAL_MUSHAF_PAGES }
+    )
+
+    // Sync HorizontalPager target when caller opens a Surah or Mushaf Page
+    LaunchedEffect(mushafPage, surahNumber) {
+        val target = (
+            mushafPage
+                ?: QuranMetadata.surahByNumber(surahNumber ?: 1).startPage
+            ).coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES) - 1
+        if (pagerState.currentPage != target) {
+            pagerState.scrollToPage(target)
+        }
+    }
+
+    val currentBookPage = (pagerState.currentPage + 1).coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+
+    val displayedSurahMeta = remember(currentBookPage, surahNumber) {
+        QuranMetadata.surahsOnPage(currentBookPage).firstOrNull()
+            ?: QuranMetadata.surahByNumber(surahNumber ?: 1)
+    }
+    val displayedJuz = remember(currentBookPage) { QuranMetadata.juzForPage(currentBookPage) }
+    val displayedHizb = remember(currentBookPage) { QuranScriptFormatter.hizbForPage(currentBookPage) }
+
+    val activeReciter = remember(prefs.selectedReciterId) {
+        QuranRecitersCatalog.reciterById(prefs.selectedReciterId)
+    }
 
     var showReciterMenu by remember { mutableStateOf(false) }
     var showSurahPicker by remember { mutableStateOf(false) }
-    var selectedVerseKey by remember(surahNumber, mushafPage) {
-        mutableStateOf(
-            if (surahNumber != null) {
-                val initAyah = if (prefs.lastReadSurah == surahNumber && prefs.lastReadAyah >= 1) prefs.lastReadAyah else 1
-                surahNumber to initAyah
-            } else {
-                verses.firstOrNull()?.let { it.surahNumber to it.ayahNumber }
-            }
-        )
+    var isFullscreenMode by remember { mutableStateOf(false) }
+
+    // Load QuranFlash Medina1 page image & persist last-read Mushaf page whenever current pager page changes
+    LaunchedEffect(pagerState.currentPage) {
+        val page = pagerState.currentPage + 1
+        viewModel.onMushafPageViewed(page)
     }
 
-    LaunchedEffect(verses, mushafPage) {
-        if (selectedVerseKey == null && verses.isNotEmpty()) {
-            selectedVerseKey = verses.first().let { it.surahNumber to it.ayahNumber }
+    val navigateToBookPage: (Int) -> Unit = { targetPage ->
+        val clamped = targetPage.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+        viewModel.ensurePageLinesLoaded(clamped)
+        scope.launch {
+            pagerState.animateScrollToPage(clamped - 1)
         }
     }
-
-    LaunchedEffect(uiState.audioState.globalAyahNumber, uiState.audioState.surahNumber) {
-        if (uiState.audioState.surahNumber > 0 && uiState.audioState.ayahNumber > 0) {
-            val match = verses.firstOrNull { it.globalNumber == uiState.audioState.globalAyahNumber }
-            if (match != null) {
-                selectedVerseKey = match.surahNumber to match.ayahNumber
-            }
-        }
-    }
-
-    val selectedIndex = verses.indexOfFirst {
-        selectedVerseKey != null && it.surahNumber == selectedVerseKey!!.first && it.ayahNumber == selectedVerseKey!!.second
-    }.let { if (it >= 0) it else 0 }
-    val selectedVerse = verses.getOrNull(selectedIndex)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(palette.pageBg)
     ) {
-        // 1. Top Navigator Bar
-        TopAppBar(
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = palette.sheetBg,
-                titleContentColor = palette.inkColor,
-                navigationIconContentColor = palette.inkColor,
-                actionIconContentColor = palette.inkColor
-            ),
-            title = {
-                Surface(
-                    shape = CircleShape,
-                    color = palette.highlightBg.copy(alpha = 0.7f),
-                    border = BorderStroke(1.dp, palette.frameBorder),
-                    modifier = Modifier
-                        .clickable { showSurahPicker = true }
-                        .testTag("tanzil_surah_picker")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isPageMode) "${strings.pageLabel} $activePage" else "${surahMeta.number}. ${surahMeta.nameEn}",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.inkColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = surahMeta.nameAr,
-                            fontFamily = NotoSansArabicFamily,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.goldAccent
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ArrowDropDown,
-                            contentDescription = "Select Surah or Page",
-                            tint = palette.goldAccent
-                        )
-                    }
-                }
-            },
-            navigationIcon = {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.testTag("surah_back_button")
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-            },
-            actions = {
-                IconButton(
-                    onClick = { viewModel.toggleTajweed() },
-                    modifier = Modifier.testTag("tanzil_tajweed_icon_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.ColorLens,
-                        contentDescription = "Tajweed Colors",
-                        tint = if (tajweedEnabled) palette.emeraldAccent else palette.secondaryInk
-                    )
-                }
-                IconButton(onClick = { viewModel.toggleTranslation() }) {
-                    Icon(
-                        imageVector = Icons.Filled.Translate,
-                        contentDescription = strings.showTranslation,
-                        tint = if (prefs.showTranslation) palette.goldAccent else palette.secondaryInk
-                    )
-                }
-                IconButton(onClick = { viewModel.toggleNightMode() }) {
-                    Icon(
-                        imageVector = Icons.Filled.DarkMode,
-                        contentDescription = strings.nightReadingMode,
-                        tint = if (nightMode) palette.goldAccent else palette.secondaryInk
-                    )
-                }
-            }
-        )
-
-        // 2. Mihrab Mushaf & Tajweed Controls Strip
-        Surface(
-            color = palette.sheetBg,
-            border = BorderStroke(0.5.dp, palette.frameBorder.copy(alpha = 0.55f))
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilterChip(
-                        selected = isMushafMode,
-                        onClick = { if (!isMushafMode) viewModel.toggleMushafMode() },
-                        label = { Text(strings.mushafViewLabel) },
-                        modifier = Modifier.testTag("tanzil_mode_mushaf")
-                    )
-                    FilterChip(
-                        selected = !isMushafMode,
-                        onClick = { if (isMushafMode) viewModel.toggleMushafMode() },
-                        label = { Text(strings.verseByVerseLabel) },
-                        modifier = Modifier.testTag("tanzil_mode_verses")
-                    )
-                    FilterChip(
-                        selected = tajweedEnabled,
-                        onClick = { viewModel.toggleTajweed() },
-                        label = { Text(if (isArabic) "تجويد ملون" else "Tajwīd") },
-                        modifier = Modifier.testTag("tanzil_tajweed_toggle")
-                    )
-                    FilterChip(
-                        selected = !isSimpleScript,
-                        onClick = { if (isSimpleScript) viewModel.toggleSimpleScript() },
-                        label = { Text(strings.uthmaniScriptLabel) },
-                        modifier = Modifier.testTag("tanzil_script_uthmani")
-                    )
-                    FilterChip(
-                        selected = isSimpleScript,
-                        onClick = { if (!isSimpleScript) viewModel.toggleSimpleScript() },
-                        label = { Text(strings.simpleScriptLabel) },
-                        modifier = Modifier.testTag("tanzil_script_simple")
-                    )
-                    if (!isPageMode) {
-                        FilterChip(
-                            selected = false,
-                            onClick = { viewModel.openMushafPage(surahMeta.startPage) },
-                            label = { Text("${strings.pageLabel} ${surahMeta.startPage}") },
-                            modifier = Modifier.testTag("open_mushaf_page_chip")
-                        )
-                    }
-
-                    Box {
-                        val activeReciter = QuranMetadata.reciters.firstOrNull { it.id == prefs.selectedReciterId }
-                            ?: QuranMetadata.reciters.first()
-                        FilledTonalButton(
-                            onClick = { showReciterMenu = true },
+        // 1. Mushaf Pages Top Bar (collapsible in fullscreen mode)
+        AnimatedVisibility(visible = !isFullscreenMode) {
+            Column {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = palette.chromeBg,
+                        titleContentColor = palette.chromeInk,
+                        navigationIconContentColor = palette.chromeInk,
+                        actionIconContentColor = palette.chromeInk
+                    ),
+                    title = {
+                        Surface(
                             shape = CircleShape,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            color = palette.chromeInk.copy(alpha = 0.14f),
+                            border = BorderStroke(0.8.dp, palette.innerFrameBorder.copy(alpha = 0.7f)),
+                            modifier = Modifier
+                                .clickable { showSurahPicker = true }
+                                .testTag("tanzil_surah_picker")
                         ) {
-                            Text(
-                                text = activeReciter.nameEn.substringBefore(" "),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showReciterMenu,
-                            onDismissRequest = { showReciterMenu = false }
-                        ) {
-                            QuranMetadata.reciters.forEach { rec ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "${rec.nameEn} (${rec.nameAr})",
-                                            fontFamily = NotoSansArabicFamily
-                                        )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isArabic) {
+                                        "سورة ${displayedSurahMeta.nameAr}"
+                                    } else {
+                                        displayedSurahMeta.nameEn
                                     },
-                                    onClick = {
-                                        viewModel.selectReciter(rec.id)
-                                        showReciterMenu = false
-                                    }
+                                    fontFamily = NotoSansArabicFamily,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = palette.chromeInk,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isArabic) {
+                                        "• ص ${QuranScriptFormatter.toArabicIndic(currentBookPage)} • ج${QuranScriptFormatter.toArabicIndic(displayedJuz.number)}"
+                                    } else {
+                                        "• p.$currentBookPage • J${displayedJuz.number}"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontFamily = NotoSansArabicFamily,
+                                    color = palette.chromeInk.copy(alpha = 0.88f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Icon(
+                                    imageVector = Icons.Filled.ArrowDropDown,
+                                    contentDescription = if (isArabic) "اختيار السورة أو الصفحة" else "Select Surah or Page",
+                                    tint = palette.chromeInk
                                 )
                             }
                         }
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier.testTag("surah_back_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = if (isArabic) "رجوع" else "Back"
+                            )
+                        }
+                    },
+                    actions = {
+                        val isPageBookmarked = uiState.bookmarks.any {
+                            it.surahNumber == 0 && it.ayahNumber == currentBookPage
+                        }
+                        IconButton(
+                            onClick = { viewModel.togglePageBookmark(currentBookPage) },
+                            modifier = Modifier.testTag("reader_bookmark_button")
+                        ) {
+                            Icon(
+                                imageVector = if (isPageBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = if (isArabic) "حفظ علامة الصفحة" else "Bookmark page",
+                                tint = if (isPageBookmarked) palette.emeraldAccent else palette.chromeInk.copy(alpha = 0.9f)
+                            )
+                        }
+                        IconButton(
+                            onClick = { isFullscreenMode = true },
+                            modifier = Modifier.testTag("quran_fullscreen_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Fullscreen,
+                                contentDescription = if (isArabic) "ملء الشاشة" else "Fullscreen",
+                                tint = palette.chromeInk.copy(alpha = 0.9f)
+                            )
+                        }
+                        IconButton(onClick = { viewModel.toggleNightMode() }) {
+                            Icon(
+                                imageVector = Icons.Filled.DarkMode,
+                                contentDescription = strings.nightReadingMode,
+                                tint = if (readingTheme == QuranReadingTheme.DARK) palette.emeraldAccent else palette.chromeInk.copy(alpha = 0.9f)
+                            )
+                        }
                     }
-                }
+                )
 
-                if (tajweedEnabled) {
-                    TajweedLegendBar(
-                        palette = palette,
-                        isArabic = isArabic
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                // 2. Mushaf Pages Only Strip + App Theme & Paper Swatches + Audio Qaree Chips
+                Surface(
+                    color = palette.sheetBg,
+                    border = BorderStroke(0.6.dp, palette.innerFrameBorder.copy(alpha = 0.45f))
                 ) {
-                    Text(
-                        text = strings.fontSizeLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = palette.secondaryInk
-                    )
-                    Slider(
-                        value = prefs.quranFontSizeSp,
-                        onValueChange = { viewModel.setFontSize(it) },
-                        valueRange = 22f..42f,
+                    Column(
                         modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp)
-                    )
-                    Text(
-                        text = "${prefs.quranFontSizeSp.toInt()}sp",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = RobotoMonoFamily,
-                        color = palette.goldAccent
-                    )
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = palette.chromeBg,
+                                shadowElevation = 1.dp,
+                                modifier = Modifier.testTag("tanzil_mode_mushaf")
+                            ) {
+                                Text(
+                                    text = if (isArabic) {
+                                        "صفحات المصحف • ${readingTheme.labelAr}"
+                                    } else {
+                                        "Mushaf Pages • ${readingTheme.labelEn}"
+                                    },
+                                    fontFamily = NotoSansArabicFamily,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = palette.chromeInk,
+                                    modifier = Modifier.padding(vertical = 5.dp, horizontal = 12.dp)
+                                )
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ThemeSwatchDot(
+                                    fill = MaterialTheme.colorScheme.primaryContainer,
+                                    selected = readingTheme == QuranReadingTheme.KSU_MUSHAF,
+                                    accent = MaterialTheme.colorScheme.primary,
+                                    tag = "theme_ksu_dot",
+                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.KSU_MUSHAF) }
+                                )
+                                ThemeSwatchDot(
+                                    fill = Color(0xFFFFFFFF),
+                                    selected = readingTheme == QuranReadingTheme.LIGHT,
+                                    accent = MaterialTheme.colorScheme.primary,
+                                    tag = "theme_light_dot",
+                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.LIGHT) }
+                                )
+                                ThemeSwatchDot(
+                                    fill = Color(0xFFF6EBD4),
+                                    selected = readingTheme == QuranReadingTheme.SEPIA,
+                                    accent = MaterialTheme.colorScheme.primary,
+                                    tag = "theme_sepia_dot",
+                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.SEPIA) }
+                                )
+                                ThemeSwatchDot(
+                                    fill = Color(0xFF181A1E),
+                                    selected = readingTheme == QuranReadingTheme.DARK,
+                                    accent = MaterialTheme.colorScheme.primary,
+                                    tag = "theme_dark_dot",
+                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.DARK) }
+                                )
+                            }
+                        }
+
+                        // Listen & Reciter Chips Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val chipColors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = palette.emeraldAccent.copy(alpha = 0.14f),
+                                selectedLabelColor = palette.emeraldAccent,
+                                selectedLeadingIconColor = palette.emeraldAccent,
+                                labelColor = palette.secondaryInk
+                            )
+
+                            val isCurrentSurahAudio = uiState.audioState.surahNumber == displayedSurahMeta.number &&
+                                uiState.audioState.surahNumber > 0 &&
+                                (uiState.audioState.isPlaying || uiState.audioState.isBuffering || uiState.audioState.isPaused)
+                            val isPlayingSurah = isCurrentSurahAudio && uiState.audioState.isPlaying
+                            val isBufferingSurah = isCurrentSurahAudio && uiState.audioState.isBuffering
+                            val isPausedSurah = isCurrentSurahAudio && uiState.audioState.isPaused
+                            FilterChip(
+                                selected = isCurrentSurahAudio,
+                                onClick = {
+                                    if (isCurrentSurahAudio) {
+                                        viewModel.toggleAudioPlayPause()
+                                    } else {
+                                        viewModel.playSurahAudio(displayedSurahMeta.number)
+                                    }
+                                },
+                                label = {
+                                    val labelText = when {
+                                        isPlayingSurah -> if (isArabic) "إيقاف مؤقت (${activeReciter.nameAr})" else "Pause (${activeReciter.nameEn})"
+                                        isBufferingSurah -> if (isArabic) "جاري التحميل..." else "Loading..."
+                                        isPausedSurah -> if (isArabic) "متابعة (${activeReciter.nameAr})" else "Continue (${activeReciter.nameEn})"
+                                        else -> if (isArabic) "استماع (${activeReciter.nameAr})" else "Listen (${activeReciter.nameEn})"
+                                    }
+                                    Text(
+                                        text = labelText,
+                                        fontFamily = NotoSansArabicFamily,
+                                        fontSize = 11.sp
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (isPlayingSurah) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                },
+                                colors = chipColors,
+                                modifier = Modifier.testTag("medina_play_surah_chip")
+                            )
+
+                            Box {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { showReciterMenu = true },
+                                    label = {
+                                        Text(
+                                            text = if (isArabic) activeReciter.nameAr else activeReciter.nameEn,
+                                            fontFamily = NotoSansArabicFamily,
+                                            fontSize = 11.sp
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Filled.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    },
+                                    colors = chipColors,
+                                    modifier = Modifier.testTag("ksu_qaree_selector_chip")
+                                )
+                                DropdownMenu(
+                                    expanded = showReciterMenu,
+                                    onDismissRequest = { showReciterMenu = false }
+                                ) {
+                                    QuranRecitersCatalog.reciters.forEach { rec ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = if (isArabic) rec.nameAr else "${rec.nameAr} • ${rec.nameEn}",
+                                                    fontFamily = NotoSansArabicFamily,
+                                                    fontWeight = if (rec.id == activeReciter.id) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (rec.id == activeReciter.id) palette.emeraldAccent else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            },
+                                            onClick = {
+                                                viewModel.selectReciter(rec.id)
+                                                showReciterMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            FilterChip(
+                                selected = false,
+                                onClick = { viewModel.cycleRepeatMode() },
+                                label = {
+                                    Text(
+                                        text = if (isArabic) {
+                                            "تكرار: ${uiState.audioState.repeatMode.labelAr}"
+                                        } else {
+                                            "Repeat ${uiState.audioState.repeatMode.label}"
+                                        },
+                                        fontFamily = NotoSansArabicFamily,
+                                        fontSize = 11.sp
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(14.dp))
+                                },
+                                colors = chipColors
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // 3. Body
-        if (uiState.isLoadingSurah && verses.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = palette.goldAccent)
-            }
-        } else if (uiState.surahLoadError != null && verses.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = uiState.surahLoadError,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            if (mushafPage != null) viewModel.openMushafPage(mushafPage)
-                            else if (surahNumber != null) viewModel.openSurah(surahNumber)
+        // 3. Authentic 604-Page RTL Medina1 Mushaf Pager (صفحات المصحف فقط)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    HorizontalPager(
+                        state = pagerState,
+                        key = { it + 1 },
+                        beyondViewportPageCount = 1,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .testTag("medina_book_pager")
+                    ) { pageIdx ->
+                        val pageNum = pageIdx + 1
+                        LaunchedEffect(pageNum) {
+                            viewModel.ensurePageLinesLoaded(pageNum)
                         }
-                    ) {
-                        Text("Retry")
-                    }
-                }
-            }
-        } else {
-            val bottomContentPad = if (uiState.audioState.isPlaying || uiState.audioState.isBuffering) 110.dp else 28.dp
-            val pagesMap = remember(verses) { verses.groupBy { it.pageNumber }.toSortedMap() }
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .testTag("tanzil_reader_list"),
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = bottomContentPad),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (isMushafMode) {
-                    // Authentic Mihrab Madinah Mushaf 604-page cards (multi-surah pages, double frames, Tajweed coloring, Khatmah toggle)
-                    items(pagesMap.entries.toList(), key = { it.key }) { (pageNum, pageVerses) ->
-                        MedinaMushafPageCard(
+                        val fallbackVerses = remember(verses, pageNum) {
+                            verses.filter { it.pageNumber == pageNum }
+                        }
+                        QuranFlashMedinaBookPageSheet(
                             pageNumber = pageNum,
-                            pageVerses = pageVerses,
+                            imageState = uiState.medinaPageImages[pageNum],
+                            pageVerses = fallbackVerses,
+                            pageLineLayout = uiState.pageLineLayouts[pageNum],
+                            readingTheme = readingTheme,
                             fontSizeSp = prefs.quranFontSizeSp,
-                            isSimpleScript = isSimpleScript,
-                            tajweedEnabled = tajweedEnabled,
+                            fontStyle = fontStyle,
+                            tajweedEnabled = false,
                             isPageMarkedRead = uiState.khatmahState.readPages.contains(pageNum),
-                            selectedVerseKey = selectedVerseKey,
+                            selectedVerseKey = null,
                             activeAudioGlobal = uiState.audioState.globalAyahNumber,
                             isAudioActive = uiState.audioState.isPlaying || uiState.audioState.isBuffering,
                             strings = strings,
                             palette = palette,
-                            onSelectVerse = { v -> selectedVerseKey = v.surahNumber to v.ayahNumber },
-                            onTogglePageRead = { p -> viewModel.togglePageRead(p) }
+                            onRetryImage = { viewModel.ensureMedinaPageImageLoaded(it, forceRefresh = true) },
+                            onToggleFullscreen = { isFullscreenMode = !isFullscreenMode },
+                            onSelectVerse = {},
+                            onSelectSurahAyah = { _, _ -> },
+                            onTogglePageRead = { viewModel.togglePageRead(it) }
                         )
-                    }
-
-                    if (selectedVerse != null) {
-                        item(key = "selected_verse_inspector") {
-                            SelectedAyahInspectorCard(
-                                verse = selectedVerse,
-                                canGoPrev = selectedIndex > 0,
-                                canGoNext = selectedIndex < verses.lastIndex,
-                                isBookmarked = uiState.bookmarks.any {
-                                    it.surahNumber == selectedVerse.surahNumber &&
-                                        it.ayahNumber == selectedVerse.ayahNumber
-                                },
-                                isPlayingThis = uiState.audioState.globalAyahNumber == selectedVerse.globalNumber &&
-                                    (uiState.audioState.isPlaying || uiState.audioState.isBuffering),
-                                showTranslation = prefs.showTranslation,
-                                tapHint = strings.tapVerseHint,
-                                palette = palette,
-                                onPrevAyah = {
-                                    verses.getOrNull(selectedIndex - 1)?.let {
-                                        selectedVerseKey = it.surahNumber to it.ayahNumber
-                                    }
-                                },
-                                onNextAyah = {
-                                    verses.getOrNull(selectedIndex + 1)?.let {
-                                        selectedVerseKey = it.surahNumber to it.ayahNumber
-                                    }
-                                },
-                                onPlay = { viewModel.playVerse(selectedVerse) },
-                                onBookmark = { viewModel.toggleBookmark(selectedVerse) }
-                            )
-                        }
-                    }
-                } else {
-                    // Verse-by-Verse Mode with Surah Banner + Standalone Bismillah + Tajweed Coloring
-                    items(verses, key = { it.globalNumber }) { verse ->
-                        if (verse.ayahNumber == 1) {
-                            val vSurahMeta = QuranMetadata.surahByNumber(verse.surahNumber)
-                            OrnamentalSurahBanner(
-                                surahMeta = vSurahMeta,
-                                strings = strings,
-                                palette = palette
-                            )
-                            if (verse.surahNumber != 1 && verse.surahNumber != 9) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                StandaloneBismillahLine(
-                                    fontSizeSp = prefs.quranFontSizeSp,
-                                    goldAccent = palette.goldAccent
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        val isBookmarked = uiState.bookmarks.any {
-                            it.surahNumber == verse.surahNumber && it.ayahNumber == verse.ayahNumber
-                        }
-                        val isPlayingThis = uiState.audioState.globalAyahNumber == verse.globalNumber &&
-                            (uiState.audioState.isPlaying || uiState.audioState.isBuffering)
-                        val stripped = QuranScriptFormatter.stripLeadingBismillah(
-                            surahNumber = verse.surahNumber,
-                            ayahNumber = verse.ayahNumber,
-                            text = verse.arabicText
-                        )
-                        val formattedArabic = QuranScriptFormatter.formatTanzilScript(
-                            uthmaniText = stripped,
-                            simple = isSimpleScript
-                        )
-                        val hasSajdah = QuranScriptFormatter.hasSajdahMark(stripped)
-
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (isPlayingThis) palette.highlightBg else palette.sheetBg,
-                            border = BorderStroke(
-                                width = if (isPlayingThis) 1.5.dp else 0.8.dp,
-                                color = if (isPlayingThis) palette.goldAccent else palette.frameBorder.copy(alpha = 0.6f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Surface(shape = CircleShape, color = palette.highlightBg) {
-                                            Text(
-                                                text = "${verse.surahNumber}:${verse.ayahNumber}",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontFamily = RobotoMonoFamily,
-                                                color = palette.goldAccent,
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                            )
-                                        }
-                                        if (hasSajdah) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = palette.goldAccent.copy(alpha = 0.15f)
-                                            ) {
-                                                Text(
-                                                    text = "۩ Sajdah",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = palette.goldAccent,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Row {
-                                        IconButton(
-                                            onClick = { viewModel.playVerse(verse) },
-                                            modifier = Modifier.testTag("play_ayah_${verse.ayahNumber}")
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isPlayingThis) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                                contentDescription = "Play verse",
-                                                tint = palette.goldAccent
-                                            )
-                                        }
-                                        IconButton(
-                                            onClick = { viewModel.toggleBookmark(verse) },
-                                            modifier = Modifier.testTag("bookmark_ayah_${verse.ayahNumber}")
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                                contentDescription = "Bookmark verse",
-                                                tint = if (isBookmarked) palette.goldAccent else palette.secondaryInk
-                                            )
-                                        }
-                                    }
-                                }
-
-                                val annotatedAyah = buildAnnotatedString {
-                                    appendFormattedVerseWithTajweed(
-                                        formattedArabic = formattedArabic,
-                                        tajweedEnabled = tajweedEnabled,
-                                        defaultInkColor = palette.inkColor,
-                                        palette = palette
-                                    )
-                                    withStyle(
-                                        SpanStyle(
-                                            color = palette.goldAccent,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    ) {
-                                        append(" ﴿${QuranScriptFormatter.toArabicIndic(verse.ayahNumber)}﴾")
-                                    }
-                                }
-
-                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                                    Text(
-                                        text = annotatedAyah,
-                                        fontFamily = AmiriFamily,
-                                        fontSize = prefs.quranFontSizeSp.sp,
-                                        lineHeight = (prefs.quranFontSizeSp * 1.85f).sp,
-                                        textAlign = TextAlign.Start,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-
-                                if (prefs.showTranslation && verse.englishTranslation.isNotBlank()) {
-                                    HorizontalDivider(color = palette.frameBorder.copy(alpha = 0.45f))
-                                    Text(
-                                        text = verse.englishTranslation,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = palette.secondaryInk
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
 
-                // Medina Mushaf Page Turner & Khatmah Advance Footer when browsing by Page
-                if (mushafPage != null) {
-                    item(key = "mushaf_page_turner") {
+                // Bottom Page Navigation & Scrubber Bar
+                AnimatedVisibility(visible = !isFullscreenMode) {
+                    Surface(
+                        color = palette.sheetBg,
+                        border = BorderStroke(0.6.dp, palette.innerFrameBorder.copy(alpha = 0.5f)),
+                        tonalElevation = 3.dp
+                    ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            var sliderPagePos by remember(currentBookPage) {
+                                mutableFloatStateOf(currentBookPage.toFloat())
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = { navigateToBookPage(currentBookPage - 1) },
+                                    enabled = currentBookPage > 1,
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.testTag("prev_mushaf_page_button")
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                        contentDescription = strings.prevPage,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = if (isArabic) "السابقة" else "Prev",
+                                        fontSize = 11.sp
+                                    )
+                                }
+
+                                Slider(
+                                    value = sliderPagePos,
+                                    onValueChange = { sliderPagePos = it },
+                                    onValueChangeFinished = {
+                                        navigateToBookPage(sliderPagePos.toInt().coerceIn(1, 604))
+                                    },
+                                    valueRange = 1f..604f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = palette.emeraldAccent,
+                                        activeTrackColor = palette.emeraldAccent
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                FilledTonalButton(
+                                    onClick = { navigateToBookPage(currentBookPage + 1) },
+                                    enabled = currentBookPage < QuranMetadata.TOTAL_MUSHAF_PAGES,
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.testTag("next_mushaf_page_button")
+                                ) {
+                                    Text(
+                                        text = if (isArabic) "التالية" else "Next",
+                                        fontSize = 11.sp
+                                    )
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                        contentDescription = strings.nextPage,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                FilledTonalButton(
-                                    onClick = { viewModel.openMushafPage(mushafPage - 1) },
-                                    enabled = mushafPage > 1,
+                                val isCurrentMarked = uiState.khatmahState.readPages.contains(currentBookPage)
+                                Surface(
                                     shape = CircleShape,
-                                    modifier = Modifier.testTag("prev_mushaf_page_button")
+                                    color = if (isCurrentMarked) palette.emeraldAccent.copy(alpha = 0.14f) else Color.Transparent,
+                                    border = BorderStroke(
+                                        0.9.dp,
+                                        if (isCurrentMarked) palette.emeraldAccent else palette.innerFrameBorder.copy(alpha = 0.65f)
+                                    ),
+                                    modifier = Modifier
+                                        .clickable { viewModel.togglePageRead(currentBookPage) }
+                                        .testTag("mushaf_mark_page_read_$currentBookPage")
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(strings.prevPage)
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isCurrentMarked) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                                            contentDescription = null,
+                                            tint = if (isCurrentMarked) palette.emeraldAccent else palette.secondaryInk,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = if (isCurrentMarked) {
+                                                if (isArabic) "مقروءة" else "Read"
+                                            } else {
+                                                if (isArabic) "تسجيل ختمة" else "Mark"
+                                            },
+                                            fontFamily = NotoSansArabicFamily,
+                                            fontSize = 11.sp,
+                                            color = if (isCurrentMarked) palette.emeraldAccent else palette.secondaryInk
+                                        )
+                                    }
                                 }
 
-                                Text(
-                                    text = "$mushafPage / ${QuranMetadata.TOTAL_MUSHAF_PAGES}",
-                                    fontFamily = RobotoMonoFamily,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = palette.goldAccent
-                                )
-
-                                FilledTonalButton(
-                                    onClick = { viewModel.openMushafPage(mushafPage + 1) },
-                                    enabled = mushafPage < QuranMetadata.TOTAL_MUSHAF_PAGES,
-                                    shape = CircleShape,
-                                    modifier = Modifier.testTag("next_mushaf_page_button")
-                                ) {
-                                    Text(strings.nextPage)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                                }
-                            }
-
-                            // Complete Page in Khatmah & Advance Button
-                            FilledTonalButton(
-                                onClick = { viewModel.markPageReadAndAdvance(mushafPage) },
-                                shape = CircleShape,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("khatmah_complete_and_next_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.CheckCircle,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = if (isArabic) {
-                                        "إتمام الصفحة $mushafPage في الختمة والانتقال للتالية"
+                                        "صفحة ${QuranScriptFormatter.toArabicIndic(currentBookPage)} من ٦٠٤ • الحزب ${QuranScriptFormatter.toArabicIndic(displayedHizb)}"
                                     } else {
-                                        "Complete Page $mushafPage in Khatmah & Next Page"
+                                        "Page $currentBookPage / 604 • Hizb $displayedHizb"
                                     },
                                     fontFamily = NotoSansArabicFamily,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = palette.inkColor
                                 )
+
+                                Surface(
+                                    shape = CircleShape,
+                                    color = palette.chromeBg,
+                                    modifier = Modifier
+                                        .clickable {
+                                            viewModel.togglePageRead(currentBookPage)
+                                            if (!isCurrentMarked && currentBookPage < 604) {
+                                                navigateToBookPage(currentBookPage + 1)
+                                            }
+                                        }
+                                        .testTag("khatmah_complete_and_next_button")
+                                ) {
+                                    Text(
+                                        text = if (isArabic) "إتمام والتالية" else "Done & Next",
+                                        fontFamily = NotoSansArabicFamily,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = palette.chromeInk,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                         }
+                    }
+                }
+            }
+
+            // Exit Fullscreen Floating Pill
+            if (isFullscreenMode) {
+                Surface(
+                    shape = CircleShape,
+                    color = palette.chromeBg.copy(alpha = 0.92f),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .clickable { isFullscreenMode = false }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.FullscreenExit,
+                            contentDescription = if (isArabic) "إظهار الأدوات" else "Show Toolbars",
+                            tint = palette.chromeInk,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = if (isArabic) "إظهار الأدوات" else "Controls",
+                            fontFamily = NotoSansArabicFamily,
+                            fontSize = 11.sp,
+                            color = palette.chromeInk
+                        )
                     }
                 }
             }
@@ -670,112 +687,39 @@ fun TanzilSurahReaderView(
 
     if (showSurahPicker) {
         SurahOrPagePickerDialog(
-            currentSurahNumber = surahNumber,
-            currentPageNumber = activePage,
+            currentSurahNumber = displayedSurahMeta.number,
+            currentPageNumber = currentBookPage,
             strings = strings,
-            onSelectSurah = { viewModel.openSurah(it) },
-            onSelectPage = { viewModel.openMushafPage(it) },
+            onSelectSurah = { s ->
+                navigateToBookPage(QuranMetadata.surahByNumber(s).startPage)
+            },
+            onSelectPage = { p ->
+                navigateToBookPage(p)
+            },
             onDismiss = { showSurahPicker = false }
         )
     }
 }
 
 @Composable
-private fun SelectedAyahInspectorCard(
-    verse: QuranVerseEntity,
-    canGoPrev: Boolean,
-    canGoNext: Boolean,
-    isBookmarked: Boolean,
-    isPlayingThis: Boolean,
-    showTranslation: Boolean,
-    tapHint: String,
-    palette: MushafPalette,
-    onPrevAyah: () -> Unit,
-    onNextAyah: () -> Unit,
-    onPlay: () -> Unit,
-    onBookmark: () -> Unit
+private fun ThemeSwatchDot(
+    fill: Color,
+    selected: Boolean,
+    accent: Color,
+    tag: String,
+    onClick: () -> Unit
 ) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = palette.highlightBg.copy(alpha = 0.55f),
-        border = BorderStroke(1.dp, palette.frameBorder),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onPrevAyah, enabled = canGoPrev) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "Previous Ayah",
-                            tint = palette.inkColor
-                        )
-                    }
-                    Surface(
-                        shape = CircleShape,
-                        color = palette.goldAccent.copy(alpha = 0.16f)
-                    ) {
-                        Text(
-                            text = "${verse.surahNumber}:${verse.ayahNumber}",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontFamily = RobotoMonoFamily,
-                            color = palette.goldAccent,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
-                    }
-                    IconButton(onClick = onNextAyah, enabled = canGoNext) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "Next Ayah",
-                            tint = palette.inkColor
-                        )
-                    }
-                }
-
-                Row {
-                    IconButton(
-                        onClick = onPlay,
-                        modifier = Modifier.testTag("play_ayah_${verse.ayahNumber}")
-                    ) {
-                        Icon(
-                            imageVector = if (isPlayingThis) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = "Play verse",
-                            tint = palette.goldAccent
-                        )
-                    }
-                    IconButton(
-                        onClick = onBookmark,
-                        modifier = Modifier.testTag("bookmark_ayah_${verse.ayahNumber}")
-                    ) {
-                        Icon(
-                            imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                            contentDescription = "Bookmark verse",
-                            tint = if (isBookmarked) palette.goldAccent else palette.secondaryInk
-                        )
-                    }
-                }
-            }
-
-            if (showTranslation && verse.englishTranslation.isNotBlank()) {
-                Text(
-                    text = verse.englishTranslation,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = palette.inkColor
-                )
-            } else {
-                Text(
-                    text = tapHint,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = palette.secondaryInk
-                )
-            }
-        }
-    }
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(fill)
+            .border(
+                width = if (selected) 2.4.dp else 1.dp,
+                color = if (selected) accent else Color(0xFF9E9E9E),
+                shape = CircleShape
+            )
+            .clickable(onClick = onClick)
+            .testTag(tag)
+    )
 }

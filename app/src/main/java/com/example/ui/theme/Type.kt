@@ -54,6 +54,16 @@ val AmiriFamily = FontFamily(
     Font(R.font.amiri, FontWeight.Bold)
 )
 
+val AmiriQuranFamily = FontFamily(
+    Font(R.font.amiri_quran, FontWeight.Normal),
+    Font(R.font.amiri_quran, FontWeight.Bold)
+)
+
+val ScheherazadeNewFamily = FontFamily(
+    Font(R.font.scheherazade_new, FontWeight.Normal),
+    Font(R.font.scheherazade_new, FontWeight.Bold)
+)
+
 fun mihrabTypography(isArabic: Boolean = false): Typography {
     val displayTitleFont = if (isArabic) NotoSansArabicFamily else BricolageDisplayFamily
     val uiFont = if (isArabic) NotoSansArabicFamily else RobotoFlexFamily

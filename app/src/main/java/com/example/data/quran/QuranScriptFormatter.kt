@@ -25,8 +25,10 @@ object QuranScriptFormatter {
         """^\s*ب[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*س[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*م[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*\s+""" +
             """[اٱأإ][\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ل[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ل[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ه[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*\s+""" +
             """[اٱ][\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ل[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ر[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ح[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*م[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ن[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*\s+""" +
-            """[اٱ][\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ل[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ر[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ح[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*[يی][\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*م[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*\s*"""
+            """[اٱ][\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ل[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ر[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*ح[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*[يیى][\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*م[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]*\s*"""
     )
+
+    private val htmlTagRegex = Regex("""<sup[^>]*>.*?</sup>|<[^>]+>""", RegexOption.DOT_MATCHES_ALL)
 
     private val ghunnahRegex = Regex("""[نم][\u064B-\u065F]*\u0651[\u064B-\u065F\u0670]*""")
     private val qalqalahRegex = Regex("""[قطبجد][\u0652\u06E1]""")
@@ -41,6 +43,16 @@ object QuranScriptFormatter {
     }
 
     fun hasSajdahMark(text: String): Boolean = text.contains('\u06E9')
+
+    fun stripTranslationHtml(raw: String): String {
+        if (!raw.contains('<')) return raw.trim()
+        return htmlTagRegex.replace(raw, " ")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&amp;", "&")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
 
     /**
      * Computes the Hizb number (1..60) for a given Madinah Mushaf page (1..604).
@@ -86,8 +98,11 @@ object QuranScriptFormatter {
     }
 
     /**
-     * Converts Tanzil Uthmani Unicode text to clean Simple / Uthmani-Minimal text offline,
-     * preserving standard vowel tashkeel while removing Medina Mushaf pause/small-high glyphs.
+     * Converts Uthmani Unicode text to clean Simple script offline:
+     * - Replaces Alef Wasla (ٱ) -> standard Alef (ا)
+     * - Replaces Uthmani Sukun (ۡ) -> standard Sukun (ْ)
+     * - Removes Tatweel (ـ) and Uthmani pause marks (U+06D6..U+06ED except Sajdah ۩)
+     * - Preserves superscript Alef (ٰ) diacritic safely without corrupting ىٰ or وٰ endings.
      */
     fun formatTanzilScript(uthmaniText: String, simple: Boolean): String {
         if (!simple) return uthmaniText
@@ -96,7 +111,6 @@ object QuranScriptFormatter {
             when (ch) {
                 '\u0671' -> sb.append('\u0627') // Alef Wasla -> standard Alef
                 '\u06E1' -> sb.append('\u0652') // Small high dotless head of khah -> Sukun
-                '\u0670' -> sb.append('\u0627') // Superscript Alef -> Alef
                 '\u0640' -> Unit // Remove kashida/tatweel
                 in '\u06D6'..'\u06ED' -> {
                     if (ch == '\u06E9') sb.append(' ').append(ch)

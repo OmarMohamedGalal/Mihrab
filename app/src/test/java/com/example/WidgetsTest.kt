@@ -17,9 +17,7 @@ import com.example.widgets.HijriDateWidgetReceiver
 import com.example.widgets.PrayerGlanceWidgetReceiver
 import com.example.widgets.PrayerTimetableWidgetReceiver
 import com.example.widgets.QiblaCircleWidgetReceiver
-import com.example.widgets.QuranListenWidgetReceiver
 import com.example.widgets.QuranVerseWidgetReceiver
-import com.example.widgets.StopQuranAudioWidgetAction
 import com.example.widgets.WidgetDestinations
 import com.example.widgets.WidgetShapeRenderer
 import com.example.widgets.WidgetThemeResolver
@@ -47,7 +45,7 @@ class WidgetsTest {
     val composeRule = createEmptyComposeRule()
 
     @Test
-    fun allSixWidgetsAreRegisteredAndResizableToAnySize() {
+    fun allFiveRemainingWidgetsAreRegisteredAndQuranListenWidgetIsRemoved() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val pm = context.packageManager
         val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
@@ -60,15 +58,17 @@ class WidgetsTest {
             QuranVerseWidgetReceiver::class.java.name,
             HijriDateWidgetReceiver::class.java.name,
             QiblaCircleWidgetReceiver::class.java.name,
-            PrayerTimetableWidgetReceiver::class.java.name,
-            QuranListenWidgetReceiver::class.java.name
+            PrayerTimetableWidgetReceiver::class.java.name
         )
         val actualClasses = receivers.map { it.activityInfo.name }.toSet()
         assertTrue(
-            "Expected all 6 widgets registered in manifest, found: $actualClasses",
+            "Expected all 5 remaining widgets registered in manifest, found: $actualClasses",
             actualClasses.containsAll(expectedClasses)
         )
-        assertEquals("Quran Listen", context.getString(R.string.widget_quran_listen_label))
+        assertFalse(
+            "QuranListenWidgetReceiver must be removed from manifest",
+            actualClasses.contains("com.example.widgets.QuranListenWidgetReceiver")
+        )
 
         receivers.forEach { resolveInfo ->
             val metaData = resolveInfo.activityInfo.metaData
@@ -126,17 +126,6 @@ class WidgetsTest {
         val circle = WidgetShapeRenderer.createQiblaCircleBitmap(240, 157.0, palette)
         assertEquals(Color.TRANSPARENT, circle.getPixel(0, 0))
         assertTrue(circle.getPixel(120, 120) != Color.TRANSPARENT)
-
-        val quranListenDisc = WidgetShapeRenderer.createQuranListenDiscBitmap(
-            sizePx = 280,
-            surahNameAr = "يس",
-            surahNameEn = "Ya-Sin",
-            reciterName = "إسلام صبحي",
-            isPlaying = true,
-            colors = palette
-        )
-        assertEquals(Color.TRANSPARENT, quranListenDisc.getPixel(0, 0))
-        assertTrue("Center of Quran Listen disc should be non-transparent", quranListenDisc.getPixel(140, 140) != Color.TRANSPARENT)
     }
 
     @Test
@@ -158,35 +147,6 @@ class WidgetsTest {
         assertEquals((initial + 2) % total, next2)
 
         WidgetUpdater.updateAll(app)
-    }
-
-    @Test
-    fun tappingQuranListenWidgetMiddleOpensSurahPlayerAndPauseButtonStopsPlayback() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val app = context as MihrabApplication
-        val audioManager = app.container.quranAudioManager
-
-        // Simulate selecting/playing Surah 36 (Ya-Sin) then tapping the widget's Pause/Stop action
-        audioManager.selectSurahForPlayer(36, "ar.islamsobhi")
-        assertEquals(36, audioManager.state.value.surahNumber)
-
-        val stopAction = StopQuranAudioWidgetAction::class.java.getDeclaredConstructor().newInstance()
-        assertNotNull(stopAction)
-        audioManager.stop()
-        assertFalse(audioManager.state.value.isPlaying)
-        assertEquals(0, audioManager.state.value.surahNumber)
-
-        // Tapping the middle of the Quran Listen widget launches MainActivity directly to the Surah's Full Now Playing player
-        val launchIntent = Intent(context, MainActivity::class.java).apply {
-            putExtra(WidgetDestinations.EXTRA_WIDGET_DESTINATION, WidgetDestinations.QURAN_LISTEN)
-            putExtra(WidgetDestinations.EXTRA_WIDGET_SURAH_NUMBER, 36)
-        }
-        ActivityScenario.launch<MainActivity>(launchIntent).use {
-            composeRule.waitForIdle()
-            composeRule.onNodeWithTag("quran_full_now_playing_screen").assertExists()
-            composeRule.onNodeWithTag("expressive_wavy_scrubber").assertExists()
-            assertEquals(36, audioManager.state.value.surahNumber)
-        }
     }
 
     @Test
@@ -259,6 +219,57 @@ class WidgetsTest {
         )
         assertNotNull(lockscreenNotif)
         assertEquals(android.app.Notification.VISIBILITY_PUBLIC, lockscreenNotif.visibility)
+    }
+
+    @Test
+    fun mushafPageBookmarkAndContinueReadingLastPagePersistAccurately() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<MihrabApplication>()
+        val repo = app.container.quranRepository
+        val store = app.container.preferencesDataStore
+
+        // Persist last viewed Mushaf page (e.g. page 42 in Surah Al-Baqarah)
+        store.updateLastReadPage(page = 42, surah = 2, ayah = 255)
+        val updatedPrefs = store.preferencesFlow.first()
+        assertEquals(42, updatedPrefs.lastReadPage)
+        assertEquals(2, updatedPrefs.lastReadSurah)
+
+        // Toggle page bookmark ON for page 42 and verify Room persistence
+        repo.setPageBookmark(pageNumber = 42, bookmarked = true)
+        val savedBookmarks = repo.observeBookmarks().first()
+        val pageBookmark = savedBookmarks.find { it.surahNumber == 0 && it.ayahNumber == 42 }
+        assertNotNull("Expected page 42 bookmark to be saved in Room", pageBookmark)
+
+        // Toggle page bookmark OFF cleanly
+        repo.setPageBookmark(pageNumber = 42, bookmarked = false)
+        val afterRemove = repo.observeBookmarks().first()
+        assertFalse(afterRemove.any { it.surahNumber == 0 && it.ayahNumber == 42 })
+    }
+
+    @Test
+    fun quranAudioManagerPauseAndContinueTogglePreservesSurahAndUpdatesPausedState() {
+        val app = ApplicationProvider.getApplicationContext<MihrabApplication>()
+        val manager = app.container.quranAudioManager
+        manager.playSurah(2, "ar.husary")
+        assertEquals(2, manager.state.value.surahNumber)
+        assertFalse(manager.state.value.isPaused)
+
+        // Pause while active/buffering
+        manager.togglePlayPause()
+        assertEquals(2, manager.state.value.surahNumber)
+        assertTrue(manager.state.value.isPaused)
+        assertFalse(manager.state.value.isPlaying)
+
+        // Continue resumes same Surah instead of resetting or clearing
+        manager.togglePlayPause()
+        assertEquals(2, manager.state.value.surahNumber)
+        assertFalse(manager.state.value.isPaused)
+
+        // Stop clears state completely
+        manager.stop()
+        assertEquals(0, manager.state.value.surahNumber)
+        assertFalse(manager.state.value.isPaused)
+        assertFalse(manager.state.value.isPlaying)
+        assertFalse(manager.state.value.isBuffering)
     }
 
     @Test

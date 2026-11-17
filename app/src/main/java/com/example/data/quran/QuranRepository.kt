@@ -20,7 +20,8 @@ data class DownloadProgress(
 class QuranRepository(
     private val quranDao: QuranDao,
     private val bookmarkDao: BookmarkDao,
-    private val remoteApi: QuranRemoteApi
+    private val remoteApi: QuranRemoteApi,
+    private val quranComLineRepository: QuranComLineRepository? = null
 ) {
     fun observeSurahVerses(surahNumber: Int): Flow<List<QuranVerseEntity>> =
         quranDao.observeSurahVerses(surahNumber)
@@ -41,7 +42,10 @@ class QuranRepository(
         bookmarkDao.observeIsBookmarked(surah, ayah)
 
     suspend fun ensureStarterDataSeeded() = withContext(Dispatchers.IO) {
-        if (quranDao.getSurahVerses(1).isEmpty()) {
+        if (quranDao.getSurahVerses(1).isEmpty() ||
+            quranDao.getPageVerses(2).isEmpty() ||
+            quranDao.getPageVerses(3).isEmpty()
+        ) {
             quranDao.insertVerses(QuranMetadata.bundledStarterVerses)
         }
     }
@@ -53,7 +57,9 @@ class QuranRepository(
             if (existing.size >= expectedCount) {
                 return@withContext Result.success(existing)
             }
-            fetchSurahFromRemote(surahNumber)
+            fetchSurahFromRemote(surahNumber).recoverCatching { err ->
+                if (existing.isNotEmpty()) existing else throw err
+            }
         }
 
     suspend fun fetchAndCachePageIfMissing(pageNumber: Int): Result<List<QuranVerseEntity>> =
@@ -73,6 +79,14 @@ class QuranRepository(
 
     suspend fun fetchSurahFromRemote(surahNumber: Int): Result<List<QuranVerseEntity>> =
         withContext(Dispatchers.IO) {
+            val quranComResult = quranComLineRepository?.fetchChapterFromQuranCom(surahNumber)
+            if (quranComResult != null && quranComResult.isSuccess) {
+                val entities = quranComResult.getOrThrow().verses
+                if (entities.isNotEmpty()) {
+                    quranDao.insertVerses(entities)
+                    return@withContext Result.success(entities)
+                }
+            }
             runCatching {
                 val response = remoteApi.getSurahArabicAndEnglish(surahNumber)
                 val arabicEdition = response.data.getOrNull(0)
@@ -90,7 +104,7 @@ class QuranRepository(
                         surahNumber = surahNumber,
                         ayahNumber = arAyah.numberInSurah,
                         arabicText = cleanArabic,
-                        englishTranslation = enText,
+                        englishTranslation = QuranScriptFormatter.stripTranslationHtml(enText),
                         juzNumber = arAyah.juz,
                         pageNumber = arAyah.page.coerceIn(1, 604)
                     )
@@ -102,8 +116,17 @@ class QuranRepository(
 
     suspend fun fetchPageFromRemote(pageNumber: Int): Result<List<QuranVerseEntity>> =
         withContext(Dispatchers.IO) {
+            val clamped = pageNumber.coerceIn(1, 604)
+            val quranComResult = quranComLineRepository?.fetchPageFromQuranCom(clamped)
+            if (quranComResult != null && quranComResult.isSuccess) {
+                val entities = quranComResult.getOrThrow().verses
+                if (entities.isNotEmpty()) {
+                    quranDao.insertVerses(entities)
+                    return@withContext Result.success(entities)
+                }
+            }
             runCatching {
-                val response = remoteApi.getMushafPageArabicAndEnglish(pageNumber.coerceIn(1, 604))
+                val response = remoteApi.getMushafPageArabicAndEnglish(clamped)
                 val arabicEdition = response.data.getOrNull(0)
                     ?: error("Arabic Mushaf page missing")
                 val englishEdition = response.data.getOrNull(1)
@@ -119,7 +142,7 @@ class QuranRepository(
                         surahNumber = arAyah.surah.number,
                         ayahNumber = arAyah.numberInSurah,
                         arabicText = cleanArabic,
-                        englishTranslation = enText,
+                        englishTranslation = QuranScriptFormatter.stripTranslationHtml(enText),
                         juzNumber = arAyah.juz,
                         pageNumber = arAyah.page.coerceIn(1, 604)
                     )
@@ -178,5 +201,34 @@ class QuranRepository(
         } else {
             bookmarkDao.deleteBySurahAyah(verse.surahNumber, verse.ayahNumber)
         }
+    }
+
+    suspend fun setPageBookmark(pageNumber: Int, bookmarked: Boolean) = withContext(Dispatchers.IO) {
+        val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+        if (bookmarked) {
+            val surahs = QuranMetadata.surahsOnPage(clamped)
+            val primarySurah = surahs.firstOrNull() ?: QuranMetadata.surahByNumber(1)
+            val juz = QuranMetadata.juzForPage(clamped).number
+            val hizb = QuranScriptFormatter.hizbForPage(clamped)
+            val cachedSnippet = quranDao.getPageVerses(clamped).firstOrNull()?.arabicText
+                ?.takeIf { it.isNotBlank() }
+                ?: "صفحة ${QuranScriptFormatter.toArabicIndic(clamped)} • الجزء ${QuranScriptFormatter.toArabicIndic(juz)} • الحزب ${QuranScriptFormatter.toArabicIndic(hizb)}"
+            bookmarkDao.upsert(
+                BookmarkEntity(
+                    surahNumber = 0,
+                    ayahNumber = clamped,
+                    surahNameEn = primarySurah.nameEn,
+                    surahNameAr = primarySurah.nameAr,
+                    arabicSnippet = cachedSnippet,
+                    createdAtEpochMs = System.currentTimeMillis()
+                )
+            )
+        } else {
+            bookmarkDao.deleteBySurahAyah(0, clamped)
+        }
+    }
+
+    suspend fun removeBookmarkEntry(bookmark: BookmarkEntity) = withContext(Dispatchers.IO) {
+        bookmarkDao.deleteBySurahAyah(bookmark.surahNumber, bookmark.ayahNumber)
     }
 }
