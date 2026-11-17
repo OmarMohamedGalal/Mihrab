@@ -467,7 +467,7 @@ fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     SettingsActionRow(
                         title = strings.aboutAppLabel,
-                        subtitle = "Mihrab v1.0 • Material 3 Expressive",
+                        subtitle = "Mihrab v2.0 • Material 3 Expressive",
                         icon = Icons.Filled.Info,
                         onClick = { showAboutDialog = true }
                     )
