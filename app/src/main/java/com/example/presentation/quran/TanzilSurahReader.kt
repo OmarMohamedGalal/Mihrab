@@ -1,7 +1,10 @@
 package com.example.presentation.quran
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,6 +18,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,22 +27,30 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,9 +76,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -138,10 +156,22 @@ fun TanzilSurahReaderView(
 
     var showReciterMenu by remember { mutableStateOf(false) }
     var showSurahPicker by remember { mutableStateOf(false) }
-    var isFullscreenMode by remember { mutableStateOf(false) }
+    var showReaderSettings by remember { mutableStateOf(false) }
+    // Reading-first: the mushaf page fills the screen by default; only quiet page metadata
+    // shows (surah, juz, page number). Tap the metadata to bring the toolbars back.
+    var isFullscreenMode by remember { mutableStateOf(true) }
+
+    // Ayah selection in the digital mushaf reader: tapping an ayah highlights it and
+    // offers copy / share / tafsir. Clears when the page turns. The tapped ayah comes
+    // from the bundled KFGQPC text, so copy & share work fully offline.
+    var selectedAyah by remember { mutableStateOf<io.github.sherifshabans.mushaf.Ayah?>(null) }
+    var tafsirAyahKey by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
 
     // Load QuranFlash Medina1 page image & persist last-read Mushaf page whenever current pager page changes
     LaunchedEffect(pagerState.currentPage) {
+        selectedAyah = null
         val page = pagerState.currentPage + 1
         viewModel.onMushafPageViewed(page)
     }
@@ -157,10 +187,11 @@ fun TanzilSurahReaderView(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(palette.pageBg)
+            .background(palette.innerPageBg)
     ) {
-        // 1. Mushaf Pages Top Bar (collapsible in fullscreen mode)
-        AnimatedVisibility(visible = !isFullscreenMode) {
+        // 1. Top bar: hidden in reading mode. Plain swap, no expand animation, so the
+        // page relayouts once per toggle instead of every animation frame.
+        if (!isFullscreenMode) {
             Column {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -258,196 +289,19 @@ fun TanzilSurahReaderView(
                                 tint = if (readingTheme == QuranReadingTheme.DARK) palette.emeraldAccent else palette.chromeInk.copy(alpha = 0.9f)
                             )
                         }
+                        IconButton(
+                            onClick = { showReaderSettings = true },
+                            modifier = Modifier.testTag("reader_settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = if (isArabic) "إعدادات القراءة" else "Reading Settings",
+                                tint = palette.chromeInk.copy(alpha = 0.9f)
+                            )
+                        }
                     }
                 )
 
-                // 2. Mushaf Pages Only Strip + App Theme & Paper Swatches + Audio Qaree Chips
-                Surface(
-                    color = palette.sheetBg,
-                    border = BorderStroke(0.6.dp, palette.innerFrameBorder.copy(alpha = 0.45f))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = palette.chromeBg,
-                                shadowElevation = 1.dp,
-                                modifier = Modifier.testTag("tanzil_mode_mushaf")
-                            ) {
-                                Text(
-                                    text = if (isArabic) {
-                                        "صفحات المصحف • ${readingTheme.labelAr}"
-                                    } else {
-                                        "Mushaf Pages • ${readingTheme.labelEn}"
-                                    },
-                                    fontFamily = NotoSansArabicFamily,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = palette.chromeInk,
-                                    modifier = Modifier.padding(vertical = 5.dp, horizontal = 12.dp)
-                                )
-                            }
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                ThemeSwatchDot(
-                                    fill = MaterialTheme.colorScheme.primaryContainer,
-                                    selected = readingTheme == QuranReadingTheme.KSU_MUSHAF,
-                                    accent = MaterialTheme.colorScheme.primary,
-                                    tag = "theme_ksu_dot",
-                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.KSU_MUSHAF) }
-                                )
-                                ThemeSwatchDot(
-                                    fill = Color(0xFFFFFFFF),
-                                    selected = readingTheme == QuranReadingTheme.LIGHT,
-                                    accent = MaterialTheme.colorScheme.primary,
-                                    tag = "theme_light_dot",
-                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.LIGHT) }
-                                )
-                                ThemeSwatchDot(
-                                    fill = Color(0xFFF6EBD4),
-                                    selected = readingTheme == QuranReadingTheme.SEPIA,
-                                    accent = MaterialTheme.colorScheme.primary,
-                                    tag = "theme_sepia_dot",
-                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.SEPIA) }
-                                )
-                                ThemeSwatchDot(
-                                    fill = Color(0xFF181A1E),
-                                    selected = readingTheme == QuranReadingTheme.DARK,
-                                    accent = MaterialTheme.colorScheme.primary,
-                                    tag = "theme_dark_dot",
-                                    onClick = { viewModel.setReadingTheme(QuranReadingTheme.DARK) }
-                                )
-                            }
-                        }
-
-                        // Listen & Reciter Chips Row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val chipColors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = palette.emeraldAccent.copy(alpha = 0.14f),
-                                selectedLabelColor = palette.emeraldAccent,
-                                selectedLeadingIconColor = palette.emeraldAccent,
-                                labelColor = palette.secondaryInk
-                            )
-
-                            val isCurrentSurahAudio = uiState.audioState.surahNumber == displayedSurahMeta.number &&
-                                uiState.audioState.surahNumber > 0 &&
-                                (uiState.audioState.isPlaying || uiState.audioState.isBuffering || uiState.audioState.isPaused)
-                            val isPlayingSurah = isCurrentSurahAudio && uiState.audioState.isPlaying
-                            val isBufferingSurah = isCurrentSurahAudio && uiState.audioState.isBuffering
-                            val isPausedSurah = isCurrentSurahAudio && uiState.audioState.isPaused
-                            FilterChip(
-                                selected = isCurrentSurahAudio,
-                                onClick = {
-                                    if (isCurrentSurahAudio) {
-                                        viewModel.toggleAudioPlayPause()
-                                    } else {
-                                        viewModel.playSurahAudio(displayedSurahMeta.number)
-                                    }
-                                },
-                                label = {
-                                    val labelText = when {
-                                        isPlayingSurah -> if (isArabic) "إيقاف مؤقت (${activeReciter.nameAr})" else "Pause (${activeReciter.nameEn})"
-                                        isBufferingSurah -> if (isArabic) "جاري التحميل..." else "Loading..."
-                                        isPausedSurah -> if (isArabic) "متابعة (${activeReciter.nameAr})" else "Continue (${activeReciter.nameEn})"
-                                        else -> if (isArabic) "استماع (${activeReciter.nameAr})" else "Listen (${activeReciter.nameEn})"
-                                    }
-                                    Text(
-                                        text = labelText,
-                                        fontFamily = NotoSansArabicFamily,
-                                        fontSize = 11.sp
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = if (isPlayingSurah) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                },
-                                colors = chipColors,
-                                modifier = Modifier.testTag("medina_play_surah_chip")
-                            )
-
-                            Box {
-                                FilterChip(
-                                    selected = false,
-                                    onClick = { showReciterMenu = true },
-                                    label = {
-                                        Text(
-                                            text = if (isArabic) activeReciter.nameAr else activeReciter.nameEn,
-                                            fontFamily = NotoSansArabicFamily,
-                                            fontSize = 11.sp
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Filled.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    },
-                                    colors = chipColors,
-                                    modifier = Modifier.testTag("ksu_qaree_selector_chip")
-                                )
-                                DropdownMenu(
-                                    expanded = showReciterMenu,
-                                    onDismissRequest = { showReciterMenu = false }
-                                ) {
-                                    QuranRecitersCatalog.reciters.forEach { rec ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = if (isArabic) rec.nameAr else "${rec.nameAr} • ${rec.nameEn}",
-                                                    fontFamily = NotoSansArabicFamily,
-                                                    fontWeight = if (rec.id == activeReciter.id) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (rec.id == activeReciter.id) palette.emeraldAccent else MaterialTheme.colorScheme.onSurface
-                                                )
-                                            },
-                                            onClick = {
-                                                viewModel.selectReciter(rec.id)
-                                                showReciterMenu = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            FilterChip(
-                                selected = false,
-                                onClick = { viewModel.cycleRepeatMode() },
-                                label = {
-                                    Text(
-                                        text = if (isArabic) {
-                                            "تكرار: ${uiState.audioState.repeatMode.labelAr}"
-                                        } else {
-                                            "Repeat ${uiState.audioState.repeatMode.label}"
-                                        },
-                                        fontFamily = NotoSansArabicFamily,
-                                        fontSize = 11.sp
-                                    )
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(14.dp))
-                                },
-                                colors = chipColors
-                            )
-                        }
-                    }
-                }
             }
         }
 
@@ -457,7 +311,14 @@ fun TanzilSurahReaderView(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        top = if (isFullscreenMode) 30.dp else 0.dp,
+                        bottom = if (isFullscreenMode) 24.dp else 0.dp
+                    )
+            ) {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     HorizontalPager(
                         state = pagerState,
@@ -469,38 +330,53 @@ fun TanzilSurahReaderView(
                             .testTag("medina_book_pager")
                     ) { pageIdx ->
                         val pageNum = pageIdx + 1
-                        LaunchedEffect(pageNum) {
-                            viewModel.ensurePageLinesLoaded(pageNum)
+                        if (uiState.ksuScanImageMode) {
+                            LaunchedEffect(pageNum) {
+                                viewModel.ensurePageLinesLoaded(pageNum)
+                            }
+                            val fallbackVerses = remember(verses, pageNum) {
+                                verses.filter { it.pageNumber == pageNum }
+                            }
+                            QuranFlashMedinaBookPageSheet(
+                                pageNumber = pageNum,
+                                imageState = uiState.medinaPageImages[pageNum],
+                                pageVerses = fallbackVerses,
+                                pageLineLayout = uiState.pageLineLayouts[pageNum],
+                                readingTheme = readingTheme,
+                                fontSizeSp = prefs.quranFontSizeSp,
+                                fontStyle = fontStyle,
+                                tajweedEnabled = false,
+                                isPageMarkedRead = uiState.khatmahState.readPages.contains(pageNum),
+                                selectedVerseKey = null,
+                                activeAudioGlobal = uiState.audioState.globalAyahNumber,
+                                isAudioActive = uiState.audioState.isPlaying || uiState.audioState.isBuffering,
+                                strings = strings,
+                                palette = palette,
+                                onRetryImage = { viewModel.ensureMedinaPageImageLoaded(it, forceRefresh = true) },
+                                onToggleFullscreen = { isFullscreenMode = !isFullscreenMode },
+                                onSelectVerse = {},
+                                onSelectSurahAyah = { _, _ -> },
+                                onTogglePageRead = { viewModel.togglePageRead(it) }
+                            )
+                        } else {
+                            // Digital Madinah text mode: offline KFGQPC Hafs text laid out like the
+                            // printed mushaf, scaled to the screen. No image or layout fetch needed.
+                            // Tapping an ayah selects it (tap again to unselect); toolbars come back
+                            // via the top metadata strip or the top-bar button, not page taps.
+                            DigitalMadinahPage(
+                                pageNumber = pageNum,
+                                palette = palette,
+                                selectedAyahId = selectedAyah?.takeIf { it.page == pageNum }?.id,
+                                onAyahClick = { ayah ->
+                                    selectedAyah = if (selectedAyah?.id == ayah.id) null else ayah
+                                }
+                            )
                         }
-                        val fallbackVerses = remember(verses, pageNum) {
-                            verses.filter { it.pageNumber == pageNum }
-                        }
-                        QuranFlashMedinaBookPageSheet(
-                            pageNumber = pageNum,
-                            imageState = uiState.medinaPageImages[pageNum],
-                            pageVerses = fallbackVerses,
-                            pageLineLayout = uiState.pageLineLayouts[pageNum],
-                            readingTheme = readingTheme,
-                            fontSizeSp = prefs.quranFontSizeSp,
-                            fontStyle = fontStyle,
-                            tajweedEnabled = false,
-                            isPageMarkedRead = uiState.khatmahState.readPages.contains(pageNum),
-                            selectedVerseKey = null,
-                            activeAudioGlobal = uiState.audioState.globalAyahNumber,
-                            isAudioActive = uiState.audioState.isPlaying || uiState.audioState.isBuffering,
-                            strings = strings,
-                            palette = palette,
-                            onRetryImage = { viewModel.ensureMedinaPageImageLoaded(it, forceRefresh = true) },
-                            onToggleFullscreen = { isFullscreenMode = !isFullscreenMode },
-                            onSelectVerse = {},
-                            onSelectSurahAyah = { _, _ -> },
-                            onTogglePageRead = { viewModel.togglePageRead(it) }
-                        )
                     }
                 }
 
-                // Bottom Page Navigation & Scrubber Bar
-                AnimatedVisibility(visible = !isFullscreenMode) {
+                // Bottom controls (tools visible): reciter pill over the page scrubber, then khatmah row.
+                if (!isFullscreenMode) {
                     Surface(
                         color = palette.sheetBg,
                         border = BorderStroke(0.6.dp, palette.innerFrameBorder.copy(alpha = 0.5f)),
@@ -512,6 +388,95 @@ fun TanzilSurahReaderView(
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            val isCurrentSurahAudio = uiState.audioState.surahNumber == displayedSurahMeta.number &&
+                                uiState.audioState.surahNumber > 0 &&
+                                (uiState.audioState.isPlaying || uiState.audioState.isBuffering || uiState.audioState.isPaused)
+                            val isPlayingSurah = isCurrentSurahAudio && uiState.audioState.isPlaying
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Box {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = palette.chromeBg,
+                                        shadowElevation = 2.dp
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier
+                                                    .clip(CircleShape)
+                                                    .clickable { showReciterMenu = true }
+                                                    .testTag("ksu_qaree_selector_chip")
+                                                    .padding(start = 14.dp, top = 7.dp, bottom = 7.dp, end = 2.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Filled.RecordVoiceOver,
+                                                    contentDescription = null,
+                                                    tint = palette.chromeInk,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (isArabic) activeReciter.nameAr else activeReciter.nameEn,
+                                                    fontFamily = NotoSansArabicFamily,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = palette.chromeInk
+                                                )
+                                                Icon(
+                                                    Icons.Filled.ArrowDropDown,
+                                                    contentDescription = if (isArabic) "اختيار القارئ" else "Choose reciter",
+                                                    tint = palette.chromeInk,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    if (isCurrentSurahAudio) {
+                                                        viewModel.toggleAudioPlayPause()
+                                                    } else {
+                                                        viewModel.playSurahAudio(displayedSurahMeta.number)
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .size(34.dp)
+                                                    .testTag("medina_play_surah_chip")
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isPlayingSurah) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                                    contentDescription = if (isArabic) "تشغيل أو إيقاف التلاوة" else "Play or pause recitation",
+                                                    tint = palette.emeraldAccent,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    DropdownMenu(
+                                        expanded = showReciterMenu,
+                                        onDismissRequest = { showReciterMenu = false }
+                                    ) {
+                                        QuranRecitersCatalog.reciters.forEach { rec ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = if (isArabic) rec.nameAr else "${rec.nameAr} • ${rec.nameEn}",
+                                                        fontFamily = NotoSansArabicFamily,
+                                                        fontWeight = if (rec.id == activeReciter.id) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (rec.id == activeReciter.id) palette.emeraldAccent else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                },
+                                                onClick = {
+                                                    viewModel.selectReciter(rec.id)
+                                                    showReciterMenu = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             var sliderPagePos by remember(currentBookPage) {
                                 mutableFloatStateOf(currentBookPage.toFloat())
                             }
@@ -651,41 +616,292 @@ fun TanzilSurahReaderView(
                 }
             }
 
-            // Exit Fullscreen Floating Pill
-            if (isFullscreenMode) {
-                Surface(
-                    shape = CircleShape,
-                    color = palette.chromeBg.copy(alpha = 0.92f),
-                    shadowElevation = 4.dp,
+            // Ayah selection sheet (digital mode): reference + tafsir / copy / share for the tapped
+            // ayah, presented as a bottom sheet like Omar's reference instead of a floating pill.
+            val tappedAyah = selectedAyah
+            if (tappedAyah != null && !uiState.ksuScanImageMode) {
+                val tappedSurahName = QuranMetadata.surahByNumber(tappedAyah.surah).nameAr
+                Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.22f))
+                        .clickable { selectedAyah = null }
+                        .testTag("ayah_sheet_scrim")
+                )
+                AyahActionSheet(
+                    reference = if (isArabic) {
+                        "سورة $tappedSurahName • ${tappedAyah.surah}:${tappedAyah.number}"
+                    } else {
+                        "${QuranMetadata.surahByNumber(tappedAyah.surah).nameEn} • ${tappedAyah.surah}:${tappedAyah.number}"
+                    },
+                    palette = palette,
+                    isArabic = isArabic,
+                    showToolsOption = isFullscreenMode,
+                    onCopy = { clipboardManager.setText(AnnotatedString(tappedAyah.text)) },
+                    onShare = {
+                        val shareText = tappedAyah.text +
+                            "\n\n" +
+                            (if (isArabic) "سورة " else "Surah ") +
+                            tappedSurahName +
+                            " ${tappedAyah.surah}:${tappedAyah.number}"
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, null))
+                    },
+                    onTafsir = {
+                        tafsirAyahKey = tappedAyah.surah to tappedAyah.number
+                        viewModel.loadTafsirForAyah(tappedAyah.surah, tappedAyah.number)
+                    },
+                    onShowTools = { isFullscreenMode = false },
+                    onDismiss = { selectedAyah = null },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+
+            // Tools-hidden state: only quiet page metadata over the page, no buttons.
+            if (isFullscreenMode && selectedAyah == null) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
                         .clickable { isFullscreenMode = false }
+                        .testTag("reader_metadata_overlay")
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.FullscreenExit,
-                            contentDescription = if (isArabic) "إظهار الأدوات" else "Show Toolbars",
-                            tint = palette.chromeInk,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = if (isArabic) "إظهار الأدوات" else "Controls",
-                            fontFamily = NotoSansArabicFamily,
-                            fontSize = 11.sp,
-                            color = palette.chromeInk
-                        )
+                    Text(
+                        text = if (isArabic) displayedSurahMeta.nameAr else displayedSurahMeta.nameEn,
+                        fontFamily = NotoSansArabicFamily,
+                        fontSize = 12.sp,
+                        color = palette.secondaryInk
+                    )
+                    Text(
+                        text = if (isArabic) {
+                            "\u0627\u0644\u062c\u0632\u0621 ${QuranScriptFormatter.toArabicIndic(displayedJuz.number)}"
+                        } else {
+                            "Part ${displayedJuz.number}"
+                        },
+                        fontFamily = NotoSansArabicFamily,
+                        fontSize = 12.sp,
+                        color = palette.secondaryInk
+                    )
+                }
+                Text(
+                    text = QuranScriptFormatter.toArabicIndic(currentBookPage),
+                    fontFamily = NotoSansArabicFamily,
+                    fontSize = 11.sp,
+                    color = palette.secondaryInk,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .clickable { isFullscreenMode = false }
+                        .testTag("reader_page_number_overlay")
+                        .padding(bottom = 8.dp)
+                )
+            }
+
+        }
+    }
+
+    // Tafsir dialog for the ayah tapped in the digital mushaf reader
+    val openTafsirKey = tafsirAyahKey
+    if (openTafsirKey != null) {
+        val tafsirState = uiState.tafsirState
+        val tafsirSurahName = QuranMetadata.surahByNumber(openTafsirKey.first).nameAr
+        Dialog(
+            onDismissRequest = {
+                tafsirAyahKey = null
+                viewModel.clearTafsir()
+            }
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = palette.sheetBg,
+                border = BorderStroke(0.8.dp, palette.innerFrameBorder.copy(alpha = 0.5f)),
+                modifier = Modifier.testTag("ayah_tafsir_dialog")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = (if (isArabic) "تفسير " else "Tafsir ") +
+                            "$tafsirSurahName ${openTafsirKey.first}:${openTafsirKey.second}",
+                        fontFamily = NotoSansArabicFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = palette.inkColor
+                    )
+                    Text(
+                        text = if (isArabic) tafsirState.edition.labelAr else tafsirState.edition.labelEn,
+                        fontFamily = NotoSansArabicFamily,
+                        fontSize = 11.sp,
+                        color = palette.secondaryInk
+                    )
+                    when {
+                        tafsirState.isLoading -> {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = palette.emeraldAccent,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = if (isArabic) "جارٍ تحميل التفسير..." else "Loading tafsir...",
+                                    fontFamily = NotoSansArabicFamily,
+                                    fontSize = 12.sp,
+                                    color = palette.secondaryInk
+                                )
+                            }
+                        }
+                        tafsirState.error != null -> {
+                            Text(
+                                text = if (isArabic) {
+                                    "تعذر تحميل التفسير الآن. يحتاج اتصالًا بالإنترنت في المرة الأولى ثم يُحفظ على الجهاز."
+                                } else {
+                                    "Tafsir could not be loaded now. It needs internet the first time, then it is saved on-device."
+                                },
+                                fontFamily = NotoSansArabicFamily,
+                                fontSize = 12.sp,
+                                color = palette.inkColor
+                            )
+                        }
+                        else -> {
+                            Text(
+                                text = tafsirState.text,
+                                fontFamily = NotoSansArabicFamily,
+                                fontSize = 14.sp,
+                                lineHeight = 22.sp,
+                                color = palette.inkColor,
+                                modifier = Modifier
+                                    .heightIn(max = 320.dp)
+                                    .verticalScroll(rememberScrollState())
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
+    // Reading settings sheet: page mode, paper theme and audio repeat live here instead of a
+    // permanent second strip under the toolbar, keeping the visible chrome to one toolbar row.
+    if (showReaderSettings) {
+        Dialog(onDismissRequest = { showReaderSettings = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = palette.sheetBg,
+                border = BorderStroke(0.8.dp, palette.innerFrameBorder.copy(alpha = 0.5f)),
+                modifier = Modifier.testTag("reader_settings_sheet")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = if (isArabic) "إعدادات القراءة" else "Reading Settings",
+                        fontFamily = NotoSansArabicFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = palette.inkColor
+                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Tap toggles digital Madinah text (default) vs scanned mushaf plates.
+                        Surface(
+                            shape = CircleShape,
+                            color = palette.chromeBg,
+                            shadowElevation = 1.dp,
+                            modifier = Modifier
+                                .testTag("tanzil_mode_mushaf")
+                                .clickable { viewModel.toggleKsuScanImageMode() }
+                        ) {
+                            Text(
+                                text = if (isArabic) {
+                                    val modeLabel = if (uiState.ksuScanImageMode) "صور المصحف" else "نص رقمي"
+                                    "صفحات المصحف • $modeLabel"
+                                } else {
+                                    val modeLabel = if (uiState.ksuScanImageMode) "Scans" else "Digital text"
+                                    "Mushaf Pages • $modeLabel"
+                                },
+                                fontFamily = NotoSansArabicFamily,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = palette.chromeInk,
+                                modifier = Modifier.padding(vertical = 5.dp, horizontal = 12.dp)
+                            )
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ThemeSwatchDot(
+                                fill = MaterialTheme.colorScheme.primaryContainer,
+                                selected = readingTheme == QuranReadingTheme.KSU_MUSHAF,
+                                accent = MaterialTheme.colorScheme.primary,
+                                tag = "theme_ksu_dot",
+                                onClick = { viewModel.setReadingTheme(QuranReadingTheme.KSU_MUSHAF) }
+                            )
+                            ThemeSwatchDot(
+                                fill = Color(0xFFFFFFFF),
+                                selected = readingTheme == QuranReadingTheme.LIGHT,
+                                accent = MaterialTheme.colorScheme.primary,
+                                tag = "theme_light_dot",
+                                onClick = { viewModel.setReadingTheme(QuranReadingTheme.LIGHT) }
+                            )
+                            ThemeSwatchDot(
+                                fill = Color(0xFFF6EBD4),
+                                selected = readingTheme == QuranReadingTheme.SEPIA,
+                                accent = MaterialTheme.colorScheme.primary,
+                                tag = "theme_sepia_dot",
+                                onClick = { viewModel.setReadingTheme(QuranReadingTheme.SEPIA) }
+                            )
+                            ThemeSwatchDot(
+                                fill = Color(0xFF181A1E),
+                                selected = readingTheme == QuranReadingTheme.DARK,
+                                accent = MaterialTheme.colorScheme.primary,
+                                tag = "theme_dark_dot",
+                                onClick = { viewModel.setReadingTheme(QuranReadingTheme.DARK) }
+                            )
+                        }
+                    }
+                    val chipColors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = palette.emeraldAccent.copy(alpha = 0.14f),
+                        selectedLabelColor = palette.emeraldAccent,
+                        selectedLeadingIconColor = palette.emeraldAccent,
+                        labelColor = palette.secondaryInk
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = { viewModel.cycleRepeatMode() },
+                        label = {
+                            Text(
+                                text = if (isArabic) {
+                                    "تكرار: ${uiState.audioState.repeatMode.labelAr}"
+                                } else {
+                                    "Repeat ${uiState.audioState.repeatMode.label}"
+                                },
+                                fontFamily = NotoSansArabicFamily,
+                                fontSize = 11.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(14.dp))
+                        },
+                        colors = chipColors
+                    )
+                }
+            }
+        }
+    }
+
     if (showSurahPicker) {
+
         SurahOrPagePickerDialog(
             currentSurahNumber = displayedSurahMeta.number,
             currentPageNumber = currentBookPage,
@@ -722,4 +938,131 @@ private fun ThemeSwatchDot(
             .clickable(onClick = onClick)
             .testTag(tag)
     )
+}
+
+/**
+ * Bottom sheet shown for the ayah tapped in the digital mushaf reader: its reference plus
+ * tafsir, copy and share rows (and a show-tools row while chrome is hidden), styled after
+ * the selection sheet in Omar's reference screenshots, in the reader's palette.
+ */
+@Composable
+internal fun AyahActionSheet(
+    reference: String,
+    palette: MushafPalette,
+    isArabic: Boolean,
+    showToolsOption: Boolean,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onTafsir: () -> Unit,
+    onShowTools: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        color = palette.sheetBg,
+        border = BorderStroke(0.8.dp, palette.innerFrameBorder.copy(alpha = 0.5f)),
+        shadowElevation = 8.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("ayah_action_strip")
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = reference,
+                    fontFamily = NotoSansArabicFamily,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.inkColor
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .testTag("ayah_sheet_close")
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = if (isArabic) "إغلاق" else "Close",
+                        tint = palette.secondaryInk,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            AyahActionSheetRow(
+                icon = Icons.Filled.MenuBook,
+                label = if (isArabic) "التفسير" else "Tafsir",
+                palette = palette,
+                tag = "ayah_tafsir_button",
+                onClick = onTafsir
+            )
+            AyahActionSheetRow(
+                icon = Icons.Filled.ContentCopy,
+                label = if (isArabic) "نسخ الآية" else "Copy Ayah",
+                palette = palette,
+                tag = "ayah_copy_button",
+                onClick = onCopy
+            )
+            AyahActionSheetRow(
+                icon = Icons.Filled.Share,
+                label = if (isArabic) "مشاركة الآية" else "Share Ayah",
+                palette = palette,
+                tag = "ayah_share_button",
+                onClick = onShare
+            )
+            if (showToolsOption) {
+                AyahActionSheetRow(
+                    icon = Icons.Filled.FullscreenExit,
+                    label = if (isArabic) "إظهار الأدوات" else "Show Controls",
+                    palette = palette,
+                    tag = "ayah_show_tools_button",
+                    onClick = {
+                        onShowTools()
+                        onDismiss()
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AyahActionSheetRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    palette: MushafPalette,
+    tag: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .testTag(tag)
+            .padding(horizontal = 8.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = palette.emeraldAccent,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = label,
+            fontFamily = NotoSansArabicFamily,
+            fontSize = 13.sp,
+            color = palette.inkColor
+        )
+    }
 }

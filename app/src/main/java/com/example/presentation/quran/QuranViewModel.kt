@@ -117,7 +117,9 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
     private val readingTheme = MutableStateFlow(loadReadingTheme())
     private val fontStyle = MutableStateFlow(loadFontStyle())
     private val pageLineLayouts = MutableStateFlow<Map<Int, MushafPageLineLayout>>(emptyMap())
-    private val ksuScanImageMode = MutableStateFlow(khatmahPrefs.getBoolean("quranflash_medina1_pages_v2", true))
+    // Digital Madinah text mode is the default (offline, screen-sized real text);
+    // scan-plate image mode remains available via the reader toggle. New pref key migrates existing installs.
+    private val ksuScanImageMode = MutableStateFlow(khatmahPrefs.getBoolean("quranflash_medina1_pages_v3", false))
     private val medinaPageImages = MutableStateFlow<Map<Int, MedinaPageImageState>>(emptyMap())
     private val selectedTafsirEdition = MutableStateFlow(loadTafsirEdition())
     private val tafsirState = MutableStateFlow(KsuTafsirState())
@@ -289,6 +291,9 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
     )
 
     fun ensurePageLinesLoaded(pageNumber: Int) {
+        // Digital text mode renders fully offline; page line layouts and scan images are
+        // only fetched while scan-plate mode is active.
+        if (!ksuScanImageMode.value) return
         val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
         if (!pageLineLayouts.value.containsKey(clamped)) {
             viewModelScope.launch {
@@ -422,7 +427,7 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
     fun toggleKsuScanImageMode() {
         val next = !ksuScanImageMode.value
         ksuScanImageMode.value = next
-        khatmahPrefs.edit().putBoolean("quranflash_medina1_pages_v2", next).apply()
+        khatmahPrefs.edit().putBoolean("quranflash_medina1_pages_v3", next).apply()
     }
 
     fun setTafsirEdition(edition: KsuTafsirEdition, activeVerse: QuranVerseEntity?) {
@@ -471,6 +476,56 @@ class QuranViewModel(private val container: AppContainer) : ViewModel() {
                 )
             }
         }
+    }
+
+    /**
+     * Tafsir entry point for the digital mushaf reader, where the tapped ayah
+     * comes from the bundled KFGQPC text and there may be no cached
+     * [QuranVerseEntity] for it. Fetches directly by surah/ayah coordinates.
+     */
+    fun loadTafsirForAyah(
+        surahNumber: Int,
+        ayahNumber: Int,
+        edition: KsuTafsirEdition = selectedTafsirEdition.value
+    ) {
+        val key = "$surahNumber:$ayahNumber"
+        tafsirFetchJob?.cancel()
+        tafsirState.value = KsuTafsirState(
+            verseKey = key,
+            edition = edition,
+            text = "",
+            isLoading = true,
+            error = null
+        )
+        tafsirFetchJob = viewModelScope.launch {
+            val result = container.quranTafsirRepository.getTafsir(
+                surahNumber = surahNumber,
+                ayahNumber = ayahNumber,
+                edition = edition
+            )
+            result.onSuccess { content ->
+                tafsirState.value = KsuTafsirState(
+                    verseKey = key,
+                    edition = edition,
+                    text = content,
+                    isLoading = false,
+                    error = null
+                )
+            }.onFailure { err ->
+                tafsirState.value = KsuTafsirState(
+                    verseKey = key,
+                    edition = edition,
+                    text = "",
+                    isLoading = false,
+                    error = err.localizedMessage ?: "Tafsir unavailable offline"
+                )
+            }
+        }
+    }
+
+    fun clearTafsir() {
+        tafsirFetchJob?.cancel()
+        tafsirState.value = KsuTafsirState()
     }
 
     fun toggleTajweed() {

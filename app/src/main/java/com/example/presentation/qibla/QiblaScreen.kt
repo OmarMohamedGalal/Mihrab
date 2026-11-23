@@ -68,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.core.design.ScallopedStarShape
+import com.example.core.i18n.AppLanguage
 import com.example.core.i18n.LocalStrings
 import com.example.core.util.FormattingUtils
 import com.example.domain.qibla.QiblaCalculator
@@ -98,7 +99,12 @@ fun QiblaScreen(
     val qiblaBearing = uiState.qiblaBearing
     val heading = compass.headingDegrees.toDouble()
     val signedDiff = QiblaCalculator.shortestSignedAngleDiff(heading, qiblaBearing)
-    val isAligned = compass.sensorAvailable && abs(signedDiff) <= 4.0
+    // Do not claim a direction (or alignment) while the magnetometer reports low/unreliable
+    // accuracy - that is exactly when the needle points the wrong way.
+    val sensorTrustworthy = compass.sensorAvailable &&
+        compass.accuracy != CompassAccuracy.LOW &&
+        compass.accuracy != CompassAccuracy.UNRELIABLE
+    val isAligned = sensorTrustworthy && abs(signedDiff) <= 4.0
 
     // Trigger subtle haptic feedback once whenever alignment is achieved
     var wasAligned by remember { mutableStateOf(false) }
@@ -147,7 +153,8 @@ fun QiblaScreen(
         LazyColumn(
             modifier = Modifier
                 .widthIn(max = 680.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .testTag("qibla_list"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -220,15 +227,19 @@ fun QiblaScreen(
                     }
                 }
 
-                // Alignment Status Pill & Sensor Accuracy
+                // Stack the status and calibration action so long Arabic labels do not collide.
+                // When the sensor is missing entirely the warning banner above already says so;
+                // there is nothing to calibrate, so both controls are hidden.
+                if (compass.sensorAvailable) {
                 item {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         val statusText = when {
-                            !compass.sensorAvailable -> strings.qiblaDirectionLabel + " ${FormattingUtils.formatDegrees(qiblaBearing)}"
+                            !compass.sensorAvailable -> strings.sensorAccuracyUnavailable
+                            !sensorTrustworthy -> strings.qiblaSensorUncertain
                             isAligned -> strings.facingQibla
                             signedDiff > 0 -> "${strings.turnRight} (${abs(signedDiff).roundToInt()}°)"
                             else -> "${strings.turnLeft} (${abs(signedDiff).roundToInt()}°)"
@@ -270,7 +281,9 @@ fun QiblaScreen(
                         }
                     }
                 }
+                }
 
+                if (sensorTrustworthy) {
                 // Large Expressive Compass Dial
                 item {
                     val primaryCol = MaterialTheme.colorScheme.primary
@@ -378,12 +391,28 @@ fun QiblaScreen(
                     }
                 }
 
-                // Sensor accuracy badge
+                } else {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().testTag("qibla_direction_unavailable"),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            FilledTonalButton(onClick = { selectedMode = 1 }) {
+                                Text(if (strings.language == AppLanguage.ARABIC) "عرض اتجاه القبلة على الخريطة" else "Show Qibla on the map")
+                            }
+                        }
+                    }
+                }
+
+                // Sensor accuracy badge (only when a sensor exists; the banner covers the missing case)
+                if (compass.sensorAvailable) {
                 item {
-                    val accText = when (compass.accuracy) {
-                        CompassAccuracy.HIGH -> strings.sensorAccuracyHigh
-                        CompassAccuracy.MEDIUM -> strings.sensorAccuracyMedium
-                        CompassAccuracy.LOW, CompassAccuracy.UNRELIABLE -> strings.sensorAccuracyLow
+                    val accText = when {
+                        !compass.sensorAvailable -> strings.sensorAccuracyUnavailable
+                        compass.accuracy == CompassAccuracy.HIGH -> strings.sensorAccuracyHigh
+                        compass.accuracy == CompassAccuracy.MEDIUM -> strings.sensorAccuracyMedium
+                        else -> strings.sensorAccuracyLow
                     }
                     Text(
                         text = accText,
@@ -394,6 +423,7 @@ fun QiblaScreen(
                             MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
+                }
                 }
             } else {
                 // Great-Circle Geodesic Map Canvas View
@@ -426,7 +456,7 @@ fun QiblaScreen(
                         )
                         MetricColumn(
                             label = strings.headingLabel,
-                            value = if (compass.sensorAvailable) FormattingUtils.formatDegrees(heading) else "—"
+                            value = if (sensorTrustworthy) FormattingUtils.formatDegrees(heading) else "—"
                         )
                         MetricColumn(
                             label = strings.distanceToKaabaLabel,

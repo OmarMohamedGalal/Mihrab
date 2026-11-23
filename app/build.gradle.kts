@@ -9,6 +9,20 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+// Local debug builds stay self-contained: generate a throwaway debug keystore when missing.
+// This key is only for local/test installs; it is not anyone's release key.
+tasks.register<Exec>("ensureDebugKeystore") {
+  val ks = rootProject.file("debug.keystore")
+  outputs.file(ks)
+  onlyIf { !ks.exists() }
+  commandLine(
+    "keytool", "-genkeypair", "-keystore", ks.absolutePath,
+    "-storepass", "android", "-alias", "androiddebugkey", "-keypass", "android",
+    "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
+    "-dname", "CN=Android Debug,O=Android,C=US"
+  )
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,8 +31,8 @@ android {
     applicationId = "com.aistudio.mihrab.kqzmxp"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "2.0"
+    versionCode = 7
+    versionName = "6.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -41,6 +55,10 @@ android {
     }
   }
 
+  afterEvaluate {
+    tasks.named("preBuild") { dependsOn("ensureDebugKeystore") }
+  }
+
   buildTypes {
     release {
       isCrunchPngs = false
@@ -54,6 +72,19 @@ android {
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
       signingConfig = signingConfigs.getByName("debugConfig")
+      // Side-by-side test build: -PmihrabTestSuffix=.test installs next to the user's existing
+      // app instead of replacing it (distinct applicationId keeps his installed data untouched).
+      providers.gradleProperty("mihrabTestSuffix").orNull?.let { suffix ->
+        applicationIdSuffix = suffix
+        versionNameSuffix = "-test"
+        resValue("string", "app_name", "Mihrab")
+        // Opt-in minified variant: add -PmihrabMinify=true for a small R8 build.
+        if (providers.gradleProperty("mihrabMinify").orNull == "true") {
+          isMinifyEnabled = true
+          isShrinkResources = true
+          proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+      }
     }
   }
   compileOptions {
@@ -63,6 +94,7 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
+    resValues = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
@@ -83,6 +115,12 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
+// Constrain the unit-test JVM on small build machines; the daemon plus an
+// unbounded test heap gets OOM-killed mid-run.
+tasks.withType<Test>().configureEach {
+  maxHeapSize = "512m"
+}
+
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   // implementation(platform(libs.firebase.bom))
@@ -108,6 +146,8 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
+  // Offline digital Madinah mushaf text (MIT-licensed mushaf-text library, bundled Hafs layout + fonts)
+  implementation("com.github.sherifshabans:mushaf-text:1.4.1")
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.coil.compose)

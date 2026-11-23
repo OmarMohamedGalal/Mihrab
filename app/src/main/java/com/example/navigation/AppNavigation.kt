@@ -102,7 +102,11 @@ fun AppNavigation(
         SliderNavItem(SettingsRoute, strings.navSettings, Icons.Filled.Settings, Icons.Outlined.Settings, "nav_settings")
     )
 
-    val isFullScreenSubRoute = currentDest?.hasRoute<CalendarRoute>() == true
+    // Reading-first: hide the app bottom bar / rail while the mushaf reader is open so the
+    // page owns the whole screen; leaving the reader (back) restores navigation.
+    val isQuranReaderOpen = currentDest?.hasRoute<QuranRoute>() == true &&
+        (quranUiState.selectedSurahNumber != null || quranUiState.selectedMushafPage != null)
+    val isFullScreenSubRoute = currentDest?.hasRoute<CalendarRoute>() == true || isQuranReaderOpen
     val selectedIndex = navItems.indexOfFirst { currentDest?.hasRoute(it.route::class) == true }
         .let { if (it >= 0) it else 0 }
 

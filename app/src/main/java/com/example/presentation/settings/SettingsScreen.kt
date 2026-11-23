@@ -60,6 +60,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,6 +98,7 @@ fun SettingsScreen(
     val isArabic = strings.language == AppLanguage.ARABIC
     val context = LocalContext.current
     val prefs = uiState.prefs
+    val settingsListState = rememberLazyListState()
 
     var showMethodDialog by remember { mutableStateOf(false) }
     var showAsrDialog by remember { mutableStateOf(false) }
@@ -125,6 +129,7 @@ fun SettingsScreen(
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
+            state = settingsListState,
             modifier = Modifier
                 .widthIn(max = 680.dp)
                 .fillMaxSize()
@@ -467,7 +472,7 @@ fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                     SettingsActionRow(
                         title = strings.aboutAppLabel,
-                        subtitle = "Mihrab v2.0 • Material 3 Expressive",
+                        subtitle = "Mihrab ${com.example.BuildConfig.VERSION_NAME}",
                         icon = Icons.Filled.Info,
                         onClick = { showAboutDialog = true }
                     )

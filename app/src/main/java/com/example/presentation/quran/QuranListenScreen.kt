@@ -131,7 +131,7 @@ fun QuranListenView(
         QuranRecitersCatalog.reciterById(uiState.prefs.selectedReciterId)
     }
 
-    // 0 = Surahs (Tracks), 1 = Reciters (57+), 2 = Favorites, 3 = Downloaded Offline
+    // 0 = Surahs (Tracks), 1 = Reciters, 2 = Favorites, 3 = Downloaded Offline
     var activeTab by rememberSaveable { mutableIntStateOf(0) }
     var listenSearchQuery by rememberSaveable { mutableStateOf("") }
     var showFullPlayer by rememberSaveable { mutableStateOf(openFullPlayerNonce > 0) }
@@ -185,7 +185,7 @@ fun QuranListenView(
                 placeholder = {
                     Text(
                         if (activeTab == 1) {
-                            if (isArabic) "ابحث في ٥٧ قارئاً (مثل: إسلام صبحي)..." else "Search 57+ reciters (e.g. Islam Sobhi)..."
+                            if (isArabic) "ابحث في ${QuranScriptFormatter.toArabicIndic(QuranRecitersCatalog.reciters.size)} قارئاً (مثل: إسلام صبحي)..." else "Search ${QuranRecitersCatalog.reciters.size} reciters (e.g. Islam Sobhi)..."
                         } else {
                             if (isArabic) "ابحث عن سورة للاستماع أو التحميل..." else "Search Surah to listen or download..."
                         }
@@ -292,7 +292,7 @@ fun QuranListenView(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = if (isArabic) "اضغط لتغيير القارئ (٥٧ قارئ) • يعمل والشاشة مغلقة" else "Tap to switch reciter (57+) • Screen-off playback",
+                                text = if (isArabic) "اضغط لتغيير القارئ (${QuranScriptFormatter.toArabicIndic(QuranRecitersCatalog.reciters.size)} قارئ) • يعمل والشاشة مغلقة" else "Tap to switch reciter (${QuranRecitersCatalog.reciters.size}) • Screen-off playback",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1,

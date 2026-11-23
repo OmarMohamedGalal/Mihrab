@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -133,7 +134,9 @@ internal fun rememberMushafPalette(theme: QuranReadingTheme): MushafPalette {
         QuranReadingTheme.KSU_MUSHAF -> MushafPalette(
             pageBg = scheme.background,
             sheetBg = scheme.surfaceContainerLow,
-            innerPageBg = scheme.surface,
+            // True ivory mushaf paper in light mode (the Material surface is lavender-tinted);
+            // keep the dark surface when the app itself is in dark mode.
+            innerPageBg = if (scheme.background.luminance() > 0.5f) Color(0xFFFAF6EC) else scheme.surface,
             chromeBg = scheme.primaryContainer,
             chromeInk = scheme.onPrimaryContainer,
             frameBorder = scheme.primary.copy(alpha = 0.72f),
@@ -685,6 +688,52 @@ private fun KsuMadinahPageBorderBox(
         ) {
             content()
         }
+    }
+}
+
+/**
+ * Digital Madinah mushaf page (offline KFGQPC Hafs text, 15 lines per page like the printed
+ * 604-page Madinah mushaf, rendered by the bundled MIT-licensed mushaf-text engine) styled as a calm,
+ * full-bleed printed sheet: the text block keeps the actual KSU Madinah plate
+ * proportions (622x917) centered on plain paper, surah banners are thin ink
+ * ornaments rather than heavy accent boxes, and tapping an ayah selects it so
+ * the reader can show its actions (tafsir / copy / share).
+ */
+@Composable
+internal fun DigitalMadinahPage(
+    pageNumber: Int,
+    palette: MushafPalette,
+    onAyahClick: (io.github.sherifshabans.mushaf.Ayah) -> Unit,
+    modifier: Modifier = Modifier,
+    selectedAyahId: Int? = null
+) {
+    val mushafColors = remember(palette) {
+        io.github.sherifshabans.mushaf.MushafColors(
+            paper = palette.innerPageBg,
+            ink = palette.inkColor,
+            marker = palette.secondaryInk,
+            bannerFill = androidx.compose.ui.graphics.Color.Transparent,
+            bannerBorder = palette.secondaryInk.copy(alpha = 0.35f),
+            bannerText = palette.inkColor,
+            selection = palette.highlightBg,
+            playing = palette.emeraldAccent.copy(alpha = 0.25f)
+        )
+    }
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(palette.innerPageBg)
+            .testTag("mushaf_page_card_$pageNumber"),
+        contentAlignment = Alignment.Center
+    ) {
+        io.github.sherifshabans.mushaf.MushafPage(
+            page = pageNumber,
+            colors = mushafColors,
+            selectedAyahIds = setOfNotNull(selectedAyahId),
+            onAyahClick = onAyahClick,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 

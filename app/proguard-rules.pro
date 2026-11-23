@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Moshi: keep @JsonClass models and generated adapters (quran.com / tafsir / weather payloads)
+-keep @com.squareup.moshi.JsonClass class * { *; }
+-keepnames @com.squareup.moshi.JsonClass class *
+-keep class ** extends com.squareup.moshi.JsonAdapter { *; }
+-keepclasseswithmembers class * {
+    @com.squareup.moshi.FromJson <methods>;
+    @com.squareup.moshi.ToJson <methods>;
+}

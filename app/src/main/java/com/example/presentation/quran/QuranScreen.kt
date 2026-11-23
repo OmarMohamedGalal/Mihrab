@@ -198,7 +198,7 @@ fun QuranScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = if (isArabic) "استماع (٥٧+ قارئ)" else "Listen (57+ Reciters)",
+                                    text = if (isArabic) "استماع" else "Listen",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontFamily = NotoSansArabicFamily,
                                     fontWeight = FontWeight.Bold,
@@ -521,31 +521,18 @@ private fun QuranBrowserView(
                                 }
                             }
 
-                            // Offline Full Quran Download Card
+                            // Offline Full Quran Download: hidden once everything is cached
                             item {
                                 val dl = uiState.downloadProgress
                                 val allCached = uiState.cachedSurahs.size >= 114
+                                if (!allCached) {
                                 Surface(
                                     shape = RoundedCornerShape(22.dp),
                                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(14.dp)) {
-                                        if (allCached) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = EmeraldAligned)
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = if (isArabic) {
-                                                        "${strings.offlineReady} (١١٤ / ١١٤)"
-                                                    } else {
-                                                        "${strings.offlineReady} (114 / 114)"
-                                                    },
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = EmeraldAligned
-                                                )
-                                            }
-                                        } else if (dl != null && !dl.isFinished) {
+                                        if (dl != null && !dl.isFinished) {
                                             Text(
                                                 text = if (isArabic) {
                                                     val sAr = QuranMetadata.surahByNumber(dl.completedSurahs.coerceIn(1, 114)).nameAr
@@ -588,6 +575,7 @@ private fun QuranBrowserView(
                                             }
                                         }
                                     }
+                                }
                                 }
                             }
 

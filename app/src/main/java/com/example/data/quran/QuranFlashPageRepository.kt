@@ -24,7 +24,8 @@ class QuranFlashPageRepository(
     appContext: Context,
     private val okHttpClient: OkHttpClient
 ) {
-    private val pagesDir = File(appContext.filesDir, "quranflash_medina1_v1").apply { mkdirs() }
+    // v2: pages cached by v1 were fetched with the pre-offset URLs and hold the wrong content.
+    private val pagesDir = File(appContext.filesDir, "quranflash_medina1_v2").apply { mkdirs() }
     private val pageLocks = Array(QuranMetadata.TOTAL_MUSHAF_PAGES + 1) { Mutex() }
 
     fun localPageFile(pageNumber: Int): File {
@@ -149,13 +150,24 @@ class QuranFlashPageRepository(
     }
 
     companion object {
+        /**
+         * quranflash Medina1 GIF numbering includes 3 front-matter pages
+         * (0001 cover, 0002 ornament, 0003 endowment), so mushaf page N lives
+         * at GIF index N + QURANFLASH_FRONT_MATTER_PAGES. Verified against the
+         * live book: 0004.gif is surat Al-Fatihah (mushaf page 1) and 0607.gif
+         * is the last page (mushaf page 604, printed ٦٠٤). Without the offset
+         * every page shows the wrong content and pages 602-604 are unreachable.
+         * KSU png_big is indexed by mushaf page directly (1.png = Al-Fatihah).
+         */
+        private const val QURANFLASH_FRONT_MATTER_PAGES = 3
+
         fun medina1UrlCandidates(pageNumber: Int): List<String> {
             val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
-            val padded4 = String.format(Locale.US, "%04d", clamped)
+            val padded4 = String.format(Locale.US, "%04d", clamped + QURANFLASH_FRONT_MATTER_PAGES)
             return listOf(
                 "https://app.quranflash.com/book/Medina1/epub/EPUB/imgs/$padded4.gif",
                 "https://www.quranflash.com/books/Medina1/data/N/$padded4.gif",
-                "https://quran.ksu.edu.sa/ayat/safahat2/$clamped.png"
+                "https://quran.ksu.edu.sa/png_big/$clamped.png"
             )
         }
 

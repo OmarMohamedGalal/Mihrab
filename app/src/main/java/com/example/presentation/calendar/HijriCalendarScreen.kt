@@ -110,7 +110,7 @@ fun HijriCalendarScreen(
                     onClick = onBack,
                     modifier = Modifier.testTag("calendar_back_button")
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = if (isArabic) "رجوع" else "Back")
                 }
             },
             actions = {
@@ -163,7 +163,7 @@ fun HijriCalendarScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(onClick = { displayedMonth = displayedMonth.minusMonths(1) }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Month")
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = if (isArabic) "الشهر السابق" else "Previous month")
                 }
                 val locale = if (isArabic) Locale("ar") else Locale.ENGLISH
                 val gMonthTitle = "${displayedMonth.month.getDisplayName(TextStyle.FULL, locale)} ${displayedMonth.year}"
@@ -181,7 +181,7 @@ fun HijriCalendarScreen(
                     )
                 }
                 IconButton(onClick = { displayedMonth = displayedMonth.plusMonths(1) }) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Month")
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = if (isArabic) "الشهر التالي" else "Next month")
                 }
             }
 

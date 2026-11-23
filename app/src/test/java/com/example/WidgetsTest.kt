@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -157,7 +158,8 @@ class WidgetsTest {
         }
         ActivityScenario.launch<MainActivity>(launchIntent).use {
             composeRule.waitForIdle()
-            composeRule.onNodeWithTag("qibla_compass_dial").assertExists()
+            // The compass tab is always present, in both sensor-available and unavailable states.
+            composeRule.onNodeWithTag("qibla_tab_compass").assertExists()
         }
     }
 

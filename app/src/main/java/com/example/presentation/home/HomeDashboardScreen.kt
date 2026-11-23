@@ -45,6 +45,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,11 +56,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,10 +96,10 @@ fun HomeDashboardScreen(
     val isArabic = strings.language == AppLanguage.ARABIC
     val prefs = uiState.prefs
     val today = uiState.now.toLocalDate()
-    val dailyVerse = AzkarRepository.verseForDate(today)
-    val dailyHadith = AzkarRepository.hadithForDate(today)
+    val dailyVerse = remember(today) { AzkarRepository.verseForDate(today) }
+    val dailyHadith = remember(today) { AzkarRepository.hadithForDate(today) }
 
-    val greeting = if (isArabic) {
+    val greeting = remember(uiState.now.hour, strings) { if (isArabic) {
         when (uiState.now.hour) {
             in 4..11 -> strings.greetingMorning
             in 12..16 -> strings.greetingAfternoon
@@ -102,7 +108,7 @@ fun HomeDashboardScreen(
         }
     } else {
         "Prayer times"
-    }
+    } }
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -111,7 +117,8 @@ fun HomeDashboardScreen(
         LazyColumn(
             modifier = Modifier
                 .widthIn(max = 680.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .testTag("home_list"),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -134,11 +141,23 @@ fun HomeDashboardScreen(
                                 modifier = Modifier.testTag("home_header_title")
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = uiState.hijriDate.formatted(isArabic),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable(onClick = onOpenCalendar).testTag("home_date_calendar")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CalendarMonth,
+                                    contentDescription = strings.calendarAndTimetable,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = uiState.hijriDate.formatted(isArabic),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                             Text(
                                 text = FormattingUtils.formatGregorianDate(today, isArabic),
                                 style = MaterialTheme.typography.bodySmall,
@@ -422,85 +441,84 @@ fun HomeDashboardScreen(
                 }
             }
 
-            // 6. Daily Quranic Verse & Hadith Inspiration Cards
+            // 6. Daily Inspiration Card: Verse / Hadith behind two small tabs (one visible at a time)
             item {
+                var inspirationTab by rememberSaveable { mutableIntStateOf(0) }
                 Card(
                     shape = RoundedCornerShape(26.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().testTag("daily_inspiration_card")
                 ) {
                     Column(
                         modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = strings.dailyVerseTitle,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = dailyVerse.arabicText,
-                            fontFamily = AmiriFamily,
-                            fontSize = 23.sp,
-                            lineHeight = 38.sp,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (!isArabic) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(strings.dailyVerseTitle, strings.dailyHadithTitle).forEachIndexed { tabIndex, tabTitle ->
+                                val selected = inspirationTab == tabIndex
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    modifier = Modifier
+                                        .clickable { inspirationTab = tabIndex }
+                                        .testTag(if (tabIndex == 0) "daily_tab_verse" else "daily_tab_hadith")
+                                ) {
+                                    Text(
+                                        text = tabTitle,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                        if (inspirationTab == 0) {
                             Text(
-                                text = dailyVerse.translationEn,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = dailyVerse.arabicText,
+                                fontFamily = AmiriFamily,
+                                fontSize = 23.sp,
+                                lineHeight = 38.sp,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (!isArabic) {
+                                Text(
+                                    text = dailyVerse.translationEn,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = if (isArabic) dailyVerse.referenceAr else dailyVerse.referenceEn,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        } else {
+                            Text(
+                                text = dailyHadith.arabicText,
+                                fontFamily = AmiriFamily,
+                                fontSize = 20.sp,
+                                lineHeight = 34.sp,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (!isArabic) {
+                                Text(
+                                    text = dailyHadith.translationEn,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = if (isArabic) dailyHadith.sourceAr else dailyHadith.sourceEn,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary
                             )
                         }
-                        Text(
-                            text = if (isArabic) dailyVerse.referenceAr else dailyVerse.referenceEn,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                }
-            }
-
-            item {
-                Card(
-                    shape = RoundedCornerShape(26.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = strings.dailyHadithTitle,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                        Text(
-                            text = dailyHadith.arabicText,
-                            fontFamily = AmiriFamily,
-                            fontSize = 20.sp,
-                            lineHeight = 34.sp,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (!isArabic) {
-                            Text(
-                                text = dailyHadith.translationEn,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            text = if (isArabic) dailyHadith.sourceAr else dailyHadith.sourceEn,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
                     }
                 }
             }
@@ -582,10 +600,9 @@ private fun NextPrayerHeroCard(uiState: MainUiState) {
                     )
                 }
 
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = strings.prayerName(next.nextPrayer),
@@ -771,47 +788,38 @@ private fun PrayerTimeRowCard(
 
             Spacer(modifier = Modifier.width(14.dp))
 
+            // Name on the first line, status on the second: no crowding, no wrapping badges.
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Text(
+                    text = strings.prayerName(entry.type),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (isNext) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (isNext) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!entry.type.isObligatory) {
                     Text(
-                        text = strings.prayerName(entry.type),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (isNext) FontWeight.Bold else FontWeight.SemiBold,
-                        color = if (isNext) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                        text = if (isArabic) "توقيت شروق" else "Solar",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false
                     )
-                    if (!entry.type.isObligatory) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Text(
-                                text = if (isArabic) "توقيت شروق" else "Solar",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    } else if (isNext) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary
-                        ) {
-                            Text(
-                                text = strings.upcoming,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    } else if (hasPassed) {
-                        Text(
-                            text = strings.completed,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                } else if (isNext) {
+                    Text(
+                        text = strings.upcoming,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                } else if (hasPassed) {
+                    Text(
+                        text = strings.completed,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 

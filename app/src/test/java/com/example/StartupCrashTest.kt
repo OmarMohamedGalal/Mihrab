@@ -40,7 +40,8 @@ class StartupCrashTest {
 
         composeRule.onNodeWithTag("nav_qibla").performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("qibla_compass_dial").assertExists()
+        // The compass tab is always present, in both sensor-available and unavailable states.
+        composeRule.onNodeWithTag("qibla_tab_compass").assertExists()
 
         composeRule.onNodeWithTag("nav_quran").performClick()
         composeRule.waitForIdle()
@@ -67,12 +68,17 @@ class StartupCrashTest {
         composeRule.onNodeWithTag("mushaf_quick_page_604").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("mushaf_page_card_604").assertExists()
+        // Reader opens in reading-first fullscreen; reveal chrome before using it.
+        composeRule.onNodeWithTag("reader_metadata_overlay").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("surah_back_button").performClick()
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("quran_tab_surahs").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("continue_reading_card").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("reader_metadata_overlay").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("tanzil_surah_picker").assertExists()
         composeRule.onNodeWithTag("medina_book_pager").assertExists()

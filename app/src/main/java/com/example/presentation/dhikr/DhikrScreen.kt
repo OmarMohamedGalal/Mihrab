@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
@@ -82,6 +83,7 @@ fun DhikrScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showCategoryPicker by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
 
     val tabs = listOf(
@@ -95,6 +97,28 @@ fun DhikrScreen(
         strings.mosqueHomeAzkar
     )
 
+    if (showCategoryPicker) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showCategoryPicker = false },
+            title = { Text(if (isArabic) "أقسام الأذكار" else "Dhikr categories") },
+            text = {
+                LazyColumn {
+                    items(tabs.size) { index ->
+                        androidx.compose.material3.TextButton(
+                            onClick = { selectedTab = index; showCategoryPicker = false },
+                            modifier = Modifier.fillMaxWidth().height(48.dp).testTag("dhikr_category_$index")
+                        ) { Text(tabs[index], fontFamily = NotoSansArabicFamily) }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { showCategoryPicker = false }) {
+                    Text(if (isArabic) "إغلاق" else "Close")
+                }
+            }
+        )
+    }
+
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
@@ -104,11 +128,25 @@ fun DhikrScreen(
                 .widthIn(max = 680.dp)
                 .fillMaxSize()
         ) {
-            Text(
-                text = strings.dhikrTitle,
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = strings.dhikrTitle,
+                    style = MaterialTheme.typography.headlineLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { showCategoryPicker = true },
+                    modifier = Modifier.testTag("dhikr_categories_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowDropDown,
+                        contentDescription = if (isArabic) "أقسام الأذكار" else "Dhikr categories"
+                    )
+                }
+            }
 
             PrimaryScrollableTabRow(
                 selectedTabIndex = selectedTab,

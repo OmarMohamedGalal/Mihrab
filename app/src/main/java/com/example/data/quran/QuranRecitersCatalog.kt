@@ -487,11 +487,11 @@ object QuranRecitersCatalog {
         ),
         ReciterOption(
             id = "ar.aymansowaid",
-            nameEn = "Dr. Ayman Suwayd",
+            nameEn = "Ayman Rushdi Swaid",
             nameAr = "د. أيمن رشدي سويد",
             styleEn = "Tajweed Master • Instructional",
             styleAr = "المصحف المعلم بالتجويد",
-            surahServerBaseUrl = "https://server8.mp3quran.net/ayman/",
+            surahServerBaseUrl = "https://server15.mp3quran.net/a-rushdi/Almusshaf-Al-Mo-lim/",
             ayahEditionId = "ar.aymanswoaid"
         ),
         ReciterOption(
@@ -590,7 +590,7 @@ object QuranRecitersCatalog {
             nameAr = "شيرزاد عبد الرحمن طاهر",
             styleEn = "Melodic Tajweed • Hafs",
             styleAr = "تلاوة متقنة عذبة",
-            surahServerBaseUrl = "https://server12.mp3quran.net/shrz/",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/shirzad-taher/r1/",
             ayahEditionId = "ar.alafasy"
         ),
         ReciterOption(
@@ -617,9 +617,497 @@ object QuranRecitersCatalog {
             nameAr = "وليد الشمسان",
             styleEn = "Masjid Al-Haram Guest Imam",
             styleAr = "إمام المسجد الحرام",
-            surahServerBaseUrl = "https://server16.mp3quran.net/shmsan/Rewayat-Hafs-A-n-Assem/",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/waleed-shamsan/r1/",
             ayahEditionId = "ar.alafasy"
-        )
+        ),
+        ReciterOption(
+            id = "ar.muftah_alsaltany",
+            nameEn = "Muftah Alsaltany",
+            nameAr = "مفتاح السلطني",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/muftah-saltani/r3/"
+        ),
+        ReciterOption(
+            id = "ar.abdulelah_bin_aoun",
+            nameEn = "Abdulelah bin Aoun",
+            nameAr = "عبدالإله بن عون",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulelah-aoun/r1/"
+        ),
+        ReciterOption(
+            id = "ar.majed_al_zamil",
+            nameEn = "Majed Al-Zamil",
+            nameAr = "ماجد الزامل",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/majed-zamil/r1/"
+        ),
+        ReciterOption(
+            id = "ar.maher_shakhashero",
+            nameEn = "Maher Shakhashero",
+            nameAr = "ماهر شخاشيرو",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/maher-shakhashiro/r1/"
+        ),
+        ReciterOption(
+            id = "ar.mousa_bilal",
+            nameEn = "Mousa Bilal",
+            nameAr = "موسى بلال",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/musa-bilal/r1/"
+        ),
+        ReciterOption(
+            id = "ar.hatem_fareed_alwaer",
+            nameEn = "Hatem Fareed Alwaer",
+            nameAr = "حاتم فريد الواعر",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/hatem-waer/r1/"
+        ),
+        ReciterOption(
+            id = "ar.mahmood_al_rifai",
+            nameEn = "Mahmood Al rifai",
+            nameAr = "محمود الرفاعي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/mahmoud-rifai/r1/"
+        ),
+        ReciterOption(
+            id = "ar.jamaan_alosaimi",
+            nameEn = "Jamaan Alosaimi",
+            nameAr = "جمعان العصيمي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/jamaan-osaimi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.yousef_bin_noah_ahmad",
+            nameEn = "Yousef Bin Noah Ahmad",
+            nameAr = "يوسف بن نوح أحمد",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/yousef-ahmad/r1/"
+        ),
+        ReciterOption(
+            id = "ar.moeedh_alharthi",
+            nameEn = "Moeedh Alharthi",
+            nameAr = "معيض الحارثي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/moeedh-harthi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmed_al_trabulsi",
+            nameEn = "Ahmed Al-trabulsi",
+            nameAr = "أحمد الطرابلسي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-tarabulsi/r2/"
+        ),
+        ReciterOption(
+            id = "ar.ahmed_amer",
+            nameEn = "Ahmed Amer",
+            nameAr = "أحمد عامر",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-amer/r1/"
+        ),
+        ReciterOption(
+            id = "ar.mohammed_osman_khan",
+            nameEn = "Mohammed Osman Khan",
+            nameAr = "محمد عثمان خان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/muhammad-khan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulbadi_ghailan",
+            nameEn = "Abdulbadi Ghailan",
+            nameAr = "عبدالبديع غيلان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulbadi-ghailan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.yusuf_alaidroos",
+            nameEn = "Yusuf ALaidroos",
+            nameAr = "يوسف العيدروس",
+            styleEn = "Hafs",
+            styleAr = "حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/yousef-aidarous/r1/"
+        ),
+        ReciterOption(
+            id = "ar.hassan_aldaghriri",
+            nameEn = "Hassan Aldaghriri",
+            nameAr = "حسن الدغريري",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/hassan-daghriri/r1/"
+        ),
+        ReciterOption(
+            id = "ar.alijon_qori",
+            nameEn = "Alijon Qori",
+            nameAr = "عليجان قوري حمدان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/alijon-hamdan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.mohammed_al_zubaidi",
+            nameEn = "Mohammed Al-Zubaidi",
+            nameAr = "محمد الزبيدي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/muhammad-zubaidi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulrahman_aloosi",
+            nameEn = "Abdulrahman Aloosi",
+            nameAr = "عبدالرحمن العوسي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulrahman-oosi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.rami_aldeais",
+            nameEn = "Rami Aldeais",
+            nameAr = "رامي الدعيس",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/rami-duais/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulrahman_al_majed",
+            nameEn = "Abdulrahman Al-Majed",
+            nameAr = "عبدالرحمن الماجد",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulrahman-majed/r1/"
+        ),
+        ReciterOption(
+            id = "ar.dawood_hamza",
+            nameEn = "Dawood Hamza",
+            nameAr = "داود حمزة",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/dawood-hamza/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmed_al_swailem",
+            nameEn = "Ahmed Al-Swailem",
+            nameAr = "أحمد السويلم",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-suwailem/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmad_shaheen",
+            nameEn = "Ahmad Shaheen",
+            nameAr = "أحمد خليل شاهين",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-shaheen/r1/"
+        ),
+        ReciterOption(
+            id = "ar.saad_almqren",
+            nameEn = "Saad Almqren",
+            nameAr = "سعد المقرن",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/saad-muqrin/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmad_al_nufais",
+            nameEn = "Ahmad Al Nufais",
+            nameAr = "أحمد النفيس",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-nufais/r1/"
+        ),
+        ReciterOption(
+            id = "ar.omar_al_darweez",
+            nameEn = "Omar Al Darweez",
+            nameAr = "عمر الدريويز",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/omar-duraiwiz/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmad_deban",
+            nameEn = "Ahmad Deban",
+            nameAr = "أحمد ديبان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-deeban/r1/"
+        ),
+        ReciterOption(
+            id = "ar.nathier_almalki",
+            nameEn = "Nathier Almalki",
+            nameAr = "نذير المالكي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/nadhir-maliki/r1/"
+        ),
+        ReciterOption(
+            id = "ar.haitham_aldukhain",
+            nameEn = "Haitham Aldukhain",
+            nameAr = "هيثم الدخين",
+            styleEn = "Hafs",
+            styleAr = "حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/haitham-dukhain/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmad_issa_al_maasaraawi",
+            nameEn = "Ahmad Issa Al Maasaraawi",
+            nameAr = "أحمد عيسى المعصراوي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-masarawi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.hashim_abu_dalal",
+            nameEn = "Hashim Abu Dalal",
+            nameAr = "هاشم أبو دلال",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/hashim-abudalal/r1/"
+        ),
+        ReciterOption(
+            id = "ar.fouad_alkhamery",
+            nameEn = "Fouad Alkhamery",
+            nameAr = "فؤاد الخامري",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/fouad-khamiri/r1/"
+        ),
+        ReciterOption(
+            id = "ar.sayed_ahmad_hashemi",
+            nameEn = "Sayed Ahmad Hashemi",
+            nameAr = "سيد أحمد هاشمي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/sayed-hashemi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.mal_allah_abdulrhman_aljaber",
+            nameEn = "Mal-Allah Abdulrhman Aljaber",
+            nameAr = "مال الله عبدالرحمن الجابر",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/malallah-jaber/r1/"
+        ),
+        ReciterOption(
+            id = "ar.salman_alsadeiq",
+            nameEn = "Salman Alsadeiq",
+            nameAr = "سلمان الصديق",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/salman-siddiq/r1/"
+        ),
+        ReciterOption(
+            id = "ar.hasan_saleh",
+            nameEn = "Hasan Saleh",
+            nameAr = "حسن صالح",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/hassan-saleh/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulrahman_alshahhat",
+            nameEn = "Abdulrahman Alshahhat",
+            nameAr = "عبدالرحمن الشحات",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulrahman-shahat/r1/"
+        ),
+        ReciterOption(
+            id = "ar.issa_omar_sanankoua",
+            nameEn = "Issa Omar Sanankoua",
+            nameAr = "عيسى عمر سناكو",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/issa-sanankoua/r1/"
+        ),
+        ReciterOption(
+            id = "ar.saleh_alquraishi",
+            nameEn = "Saleh Alquraishi",
+            nameAr = "صالح القريشي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/saleh-quraishi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.saleh_alshamrani",
+            nameEn = "Saleh Alshamrani",
+            nameAr = "صالح الشمراني",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/saleh-shamrani/r1/"
+        ),
+        ReciterOption(
+            id = "ar.faisal_al_hajry",
+            nameEn = "Faisal Al-Hajry",
+            nameAr = "فيصل الهاجري",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/faisal-hajri/r1/"
+        ),
+        ReciterOption(
+            id = "ar.anas_alemadi",
+            nameEn = "Anas Alemadi",
+            nameAr = "أنس العمادي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/anas-emadi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.sayeed_ramadan",
+            nameEn = "Sayeed Ramadan",
+            nameAr = "سيد رمضان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/sayed-ramadan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.saleh_alsahood",
+            nameEn = "Saleh Alsahood",
+            nameAr = "صالح الصاهود",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/saleh-sahood/r1/"
+        ),
+        ReciterOption(
+            id = "ar.saleh_al_habdan",
+            nameEn = "Saleh Al-Habdan",
+            nameAr = "صالح الهبدان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/saleh-habdan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.salah_alhashim",
+            nameEn = "Salah Alhashim",
+            nameAr = "صلاح الهاشم",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/salah-hashim/r1/"
+        ),
+        ReciterOption(
+            id = "ar.mukhtar_al_haj",
+            nameEn = "Mukhtar Al-Haj",
+            nameAr = "مختار الحاج",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/mukhtar-haj/r1/"
+        ),
+        ReciterOption(
+            id = "ar.adel_ryyan",
+            nameEn = "Adel Ryyan",
+            nameAr = "عادل ريان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/adel-rayyan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmad_al_hawashi",
+            nameEn = "Ahmad Al-Hawashi",
+            nameAr = "أحمد الحواشي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-hawashi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulmohsin_al_harthy",
+            nameEn = "Abdulmohsin Al-Harthy",
+            nameAr = "عبدالمحسن الحارثي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulmohsen-harthi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulmohsin_al_obaikan",
+            nameEn = "Abdulmohsin Al-Obaikan",
+            nameAr = "عبدالمحسن العبيكان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulmohsen-obaikan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulhadi_kanakeri",
+            nameEn = "Abdulhadi Kanakeri",
+            nameAr = "عبدالهادي أحمد كناكري",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulhadi-kanakeri/r1/"
+        ),
+        ReciterOption(
+            id = "ar.abdulwali_al_arkani",
+            nameEn = "Abdulwali Al-Arkani",
+            nameAr = "عبدالولي الأركاني",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/abdulwali-arkani/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ali_hajjaj_alsouasi",
+            nameEn = "Ali Hajjaj Alsouasi",
+            nameAr = "علي حجاج السويسي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ali-souissi/r1/"
+        ),
+        ReciterOption(
+            id = "ar.emad_hafez",
+            nameEn = "Emad Hafez",
+            nameAr = "عماد زهير حافظ",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/imad-hafez/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmad_saber",
+            nameEn = "Ahmad Saber",
+            nameAr = "أحمد صابر",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-saber/r1/"
+        ),
+        ReciterOption(
+            id = "ar.neamah_al_hassan",
+            nameEn = "Neamah Al-Hassan",
+            nameAr = "نعمة الحسان",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/neama-hassan/r1/"
+        ),
+        ReciterOption(
+            id = "ar.ahmad_nauina",
+            nameEn = "Ahmad Nauina",
+            nameAr = "أحمد نعينع",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/ahmad-naina/r1/"
+        ),
+        ReciterOption(
+            id = "ar.yahya_hawwa",
+            nameEn = "Yahya Hawwa",
+            nameAr = "يحيى حوا",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/yahya-hawwa/r1/"
+        ),
+        ReciterOption(
+            id = "ar.yousef_alshoaey",
+            nameEn = "Yousef Alshoaey",
+            nameAr = "يوسف الشويعي",
+            styleEn = "Murattal • Hafs",
+            styleAr = "مرتل • حفص عن عاصم",
+            surahServerBaseUrl = "https://cdn.mp3quran.net/audio/yousef-shoaey/r1/"
+        ),
     )
 
     fun reciterById(id: String): ReciterOption =

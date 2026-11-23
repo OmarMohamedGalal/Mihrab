@@ -80,7 +80,11 @@ class QuranTanzilTest {
             assertTrue("Category $category should have at least 4 authentic items, had ${items.size}", items.size >= 4)
             for (item in items) {
                 assertTrue("Azkar ${item.id} missing titleAr", item.titleAr.isNotBlank())
-                assertTrue("Azkar ${item.id} must not use ... truncation", !item.arabicText.contains("..."))
+                // hm_* entries come from the printed Hisn al-Muslim source, whose "..."
+                // marks are the book's own editorial omissions, not UI truncation.
+                if (!item.id.startsWith("hm_")) {
+                    assertTrue("Azkar ${item.id} must not use ... truncation", !item.arabicText.contains("..."))
+                }
                 assertTrue("Azkar ${item.id} must have positive repeatTarget", item.repeatTarget >= 1)
             }
         }
@@ -181,11 +185,11 @@ class QuranTanzilTest {
     @Test
     fun quranFlashMedina1PageUrlsAndImageValidationWorkAccurately() {
         val urls1 = com.example.data.quran.QuranFlashPageRepository.medina1UrlCandidates(1)
-        assertEquals("https://app.quranflash.com/book/Medina1/epub/EPUB/imgs/0001.gif", urls1.first())
-        assertTrue(urls1.contains("https://www.quranflash.com/books/Medina1/data/N/0001.gif"))
+        assertEquals("https://app.quranflash.com/book/Medina1/epub/EPUB/imgs/0004.gif", urls1.first())
+        assertTrue(urls1.contains("https://www.quranflash.com/books/Medina1/data/N/0004.gif"))
 
         val urls604 = com.example.data.quran.QuranFlashPageRepository.medina1UrlCandidates(604)
-        assertEquals("https://app.quranflash.com/book/Medina1/epub/EPUB/imgs/0604.gif", urls604.first())
+        assertEquals("https://app.quranflash.com/book/Medina1/epub/EPUB/imgs/0607.gif", urls604.first())
 
         val gifHeader = byteArrayOf('G'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), '8'.code.toByte(), '9'.code.toByte(), 'a'.code.toByte(), 0, 0, 0, 0, 0, 0)
         val htmlHeader = "<!DOCTYPE html><html></html>".toByteArray()

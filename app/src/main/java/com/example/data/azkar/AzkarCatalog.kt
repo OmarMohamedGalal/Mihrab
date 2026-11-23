@@ -1222,5 +1222,5 @@ object AzkarCatalog {
             referenceAr = "سورة البقرة ١٢٧-١٢٨",
             repeatTarget = 1
         )
-    )
+    ) + AzkarExpansion.hisnAlmuslimItems
 }
