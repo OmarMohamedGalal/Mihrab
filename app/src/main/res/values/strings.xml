@@ -12,8 +12,4 @@
     <string name="widget_timetable_desc">Today\'s 5 daily prayer times — reshapes to any size</string>
     <string name="widget_day_card_label">Day card</string>
     <string name="widget_day_card_desc">Weekday with the date</string>
-    <string name="widget_quran_ayah_label">Ayah &amp; Translation</string>
-    <string name="widget_quran_ayah_desc">Transparent Quran ayah with its English translation - tap to switch the ayah</string>
-    <string name="widget_day_date_label">Day &amp; Date</string>
-    <string name="widget_day_date_desc">Transparent weekday with the date - tap to open the app</string>
 </resources>
