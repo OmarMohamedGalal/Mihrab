@@ -30,7 +30,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 
-private fun arabicDayName(day: DayOfWeek): String = when (day) {
+internal fun arabicDayName(day: DayOfWeek): String = when (day) {
     DayOfWeek.SATURDAY -> "السبت"
     DayOfWeek.SUNDAY -> "الأحد"
     DayOfWeek.MONDAY -> "الاثنين"

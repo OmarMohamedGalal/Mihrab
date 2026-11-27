@@ -429,5 +429,17 @@ object WidgetUpdater {
             val w = PrayerTimetableWidget()
             manager.getGlanceIds(PrayerTimetableWidget::class.java).forEach { w.update(context, it) }
         }
+        runCatching {
+            val w = DayCardWidget()
+            manager.getGlanceIds(DayCardWidget::class.java).forEach { w.update(context, it) }
+        }
+        runCatching {
+            val w = QuranAyahWidget()
+            manager.getGlanceIds(QuranAyahWidget::class.java).forEach { w.update(context, it) }
+        }
+        runCatching {
+            val w = DayDateWidget()
+            manager.getGlanceIds(DayDateWidget::class.java).forEach { w.update(context, it) }
+        }
     }
 }

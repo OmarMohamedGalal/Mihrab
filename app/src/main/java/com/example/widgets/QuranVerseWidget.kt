@@ -48,7 +48,10 @@ import com.example.data.azkar.AzkarRepository
 import com.example.data.azkar.DailyVerseItem
 import kotlinx.coroutines.flow.first
 
-private val GLANCE_VERSE_INDEX_KEY = intPreferencesKey("glance_verse_index")
+internal val GLANCE_VERSE_INDEX_KEY = intPreferencesKey("glance_verse_index")
+
+/** Every Quran widget cycles together: tapping any of them moves all of them to the next ayah. */
+internal fun quranWidgets(): List<GlanceAppWidget> = listOf(QuranVerseWidget(), QuranAyahWidget())
 
 class ChangeQuranVerseAction : ActionCallback {
     override suspend fun onAction(
@@ -59,17 +62,10 @@ class ChangeQuranVerseAction : ActionCallback {
         val app = context.applicationContext as MihrabApplication
         val total = AzkarRepository.dailyVerses.size
         val nextIndex = app.container.preferencesDataStore.cycleQuranWidgetVerse(total)
+        val manager = androidx.glance.appwidget.GlanceAppWidgetManager(context)
 
-        val ids = androidx.glance.appwidget.GlanceAppWidgetManager(context)
-            .getGlanceIds(QuranVerseWidget::class.java)
-        if (ids.isEmpty()) {
-            updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { state ->
-                state.toMutablePreferences().apply {
-                    this[GLANCE_VERSE_INDEX_KEY] = nextIndex
-                }
-            }
-            QuranVerseWidget().update(context, glanceId)
-        } else {
+        quranWidgets().forEach { widget ->
+            val ids = manager.getGlanceIds(widget::class.java)
             ids.forEach { id ->
                 updateAppWidgetState(context, PreferencesGlanceStateDefinition, id) { state ->
                     state.toMutablePreferences().apply {
@@ -77,7 +73,7 @@ class ChangeQuranVerseAction : ActionCallback {
                     }
                 }
             }
-            QuranVerseWidget().updateAll(context)
+            widget.updateAll(context)
         }
     }
 }
