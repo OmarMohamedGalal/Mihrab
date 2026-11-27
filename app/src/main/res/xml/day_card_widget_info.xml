@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_day_card_desc"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewLayout="@layout/day_card_preview"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="48dp"
+    android:maxResizeWidth="600dp"
+    android:maxResizeHeight="600dp"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="3600000"
+    android:widgetCategory="home_screen|keyguard" />

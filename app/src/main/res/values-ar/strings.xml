@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">محراب</string>
     <string name="widget_description">مواقيت الصلاة القادمة والعد التنازلي والتاريخ الهجري</string>
+    <string name="widget_day_card_label">بطاقة اليوم</string>
+    <string name="widget_day_card_desc">اسم اليوم مع التاريخ</string>
 </resources>

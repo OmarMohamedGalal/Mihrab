@@ -80,6 +80,7 @@ class HijriDateWidget : GlanceAppWidget() {
                     isArabic = isArabic,
                     isTiny = isTiny,
                     isTall = isTall,
+                    widthDp = size.width.value,
                     palette = palette,
                     clickAction = clickAction
                 )
@@ -96,6 +97,7 @@ class HijriDateWidget : GlanceAppWidget() {
         isArabic: Boolean,
         isTiny: Boolean,
         isTall: Boolean,
+        widthDp: Float,
         palette: ResolvedWidgetPalette,
         clickAction: Action
     ) {
@@ -205,48 +207,58 @@ class HijriDateWidget : GlanceAppWidget() {
                 }
             }
         } else {
-            // Signature 1x2 Capsule Pill inspired by the attached Drive pill with circular badge
+            // 1x2 capsule: same layout, but text sizes shrink to the width that is really available
+            // so month, year and the Gregorian line are always fully visible (no ellipsis).
+            val badge = 32f
+            val textWidth = (widthDp - 22f - badge - 6f).coerceAtLeast(40f)
+            val line1 = "$monthName ${hijri.year} $suffix"
+            val line2 = gregorianLabel
+            val fs1 = (textWidth / (line1.length * 0.62f)).coerceIn(7f, 13f)
+            val fs2 = (textWidth / (line2.length * 0.62f)).coerceIn(7f, 10f)
             Row(
                 modifier = GlanceModifier
                     .fillMaxSize()
                     .background(ColorProvider(palette.primaryColor))
                     .cornerRadius(99.dp)
                     .clickable(clickAction)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(start = 11.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = GlanceModifier.defaultWeight()) {
+                Column(
+                    modifier = GlanceModifier.defaultWeight(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "$monthName ${hijri.year} $suffix",
+                        text = line1,
                         style = TextStyle(
                             color = ColorProvider(palette.onPrimaryColor),
-                            fontSize = 13.sp,
+                            fontSize = fs1.sp,
                             fontWeight = FontWeight.Bold
                         ),
                         maxLines = 1
                     )
                     Text(
-                        text = gregorianLabel,
+                        text = line2,
                         style = TextStyle(
                             color = ColorProvider(palette.primaryContainerColor),
-                            fontSize = 10.sp
+                            fontSize = fs2.sp
                         ),
                         maxLines = 1
                     )
                 }
-                Spacer(modifier = GlanceModifier.width(8.dp))
+                Spacer(modifier = GlanceModifier.width(6.dp))
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = GlanceModifier
-                        .size(38.dp)
+                        .size(badge.dp)
                         .background(ColorProvider(palette.primaryContainerColor))
-                        .cornerRadius(19.dp)
+                        .cornerRadius((badge / 2).dp)
                 ) {
                     Text(
                         text = "${hijri.day}",
                         style = TextStyle(
                             color = ColorProvider(palette.onPrimaryContainerColor),
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
                     )
