@@ -12,4 +12,10 @@
     <string name="widget_timetable_desc">Today\'s 5 daily prayer times — reshapes to any size</string>
     <string name="widget_day_card_label">Day card</string>
     <string name="widget_day_card_desc">Weekday with the date</string>
+    <string name="widget_transparent_month_label">Transparent Month</string>
+    <string name="widget_transparent_month_desc">Transparent Arabic calligraphy month, day number, and Hijri date overlay</string>
+    <string name="widget_transparent_quran_label">Transparent Quran Ayah</string>
+    <string name="widget_transparent_quran_desc">Transparent Quranic ayah with translation — tap to switch verse</string>
+    <string name="widget_transparent_weekday_label">Transparent Weekday</string>
+    <string name="widget_transparent_weekday_desc">Transparent Arabic calligraphy weekday with Gregorian &amp; Hijri dates</string>
 </resources>

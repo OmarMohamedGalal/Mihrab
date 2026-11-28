@@ -48,7 +48,7 @@ import com.example.data.azkar.AzkarRepository
 import com.example.data.azkar.DailyVerseItem
 import kotlinx.coroutines.flow.first
 
-private val GLANCE_VERSE_INDEX_KEY = intPreferencesKey("glance_verse_index")
+internal val GLANCE_VERSE_INDEX_KEY = intPreferencesKey("glance_verse_index")
 
 class ChangeQuranVerseAction : ActionCallback {
     override suspend fun onAction(
@@ -60,24 +60,35 @@ class ChangeQuranVerseAction : ActionCallback {
         val total = AzkarRepository.dailyVerses.size
         val nextIndex = app.container.preferencesDataStore.cycleQuranWidgetVerse(total)
 
-        val ids = androidx.glance.appwidget.GlanceAppWidgetManager(context)
-            .getGlanceIds(QuranVerseWidget::class.java)
-        if (ids.isEmpty()) {
+        val manager = androidx.glance.appwidget.GlanceAppWidgetManager(context)
+        val classicIds = manager.getGlanceIds(QuranVerseWidget::class.java)
+        val transparentIds = manager.getGlanceIds(TransparentQuranVerseWidget::class.java)
+
+        if (classicIds.isEmpty() && transparentIds.isEmpty()) {
             updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { state ->
                 state.toMutablePreferences().apply {
                     this[GLANCE_VERSE_INDEX_KEY] = nextIndex
                 }
             }
             QuranVerseWidget().update(context, glanceId)
+            TransparentQuranVerseWidget().update(context, glanceId)
         } else {
-            ids.forEach { id ->
+            classicIds.forEach { id ->
                 updateAppWidgetState(context, PreferencesGlanceStateDefinition, id) { state ->
                     state.toMutablePreferences().apply {
                         this[GLANCE_VERSE_INDEX_KEY] = nextIndex
                     }
                 }
             }
-            QuranVerseWidget().updateAll(context)
+            transparentIds.forEach { id ->
+                updateAppWidgetState(context, PreferencesGlanceStateDefinition, id) { state ->
+                    state.toMutablePreferences().apply {
+                        this[GLANCE_VERSE_INDEX_KEY] = nextIndex
+                    }
+                }
+            }
+            if (classicIds.isNotEmpty()) QuranVerseWidget().updateAll(context)
+            if (transparentIds.isNotEmpty()) TransparentQuranVerseWidget().updateAll(context)
         }
     }
 }

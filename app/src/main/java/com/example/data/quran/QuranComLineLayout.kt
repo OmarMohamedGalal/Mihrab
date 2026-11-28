@@ -104,13 +104,20 @@ interface QuranComV4Api {
 class QuranComLineRepository(
     appContext: Context,
     private val api: QuranComV4Api,
-    private val moshi: Moshi
+    private val moshi: Moshi,
+    private val bundledLoader: BundledMedinaMushafLoader? = null
 ) {
     private val cacheDir = File(appContext.filesDir, "quran_com_lines_v2").apply { mkdirs() }
     private val pageAdapter by lazy { moshi.adapter(MushafPageLineLayout::class.java) }
 
+    fun getCachedOrBundledPageLinesSync(pageNumber: Int): MushafPageLineLayout? {
+        val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+        return bundledLoader?.getCachedPageLayoutSync(clamped)
+    }
+
     suspend fun getOrFetchPageLines(pageNumber: Int): MushafPageLineLayout? = withContext(Dispatchers.IO) {
         val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+        bundledLoader?.getPageLayout(clamped)?.let { return@withContext it }
         readCachedPageLayout(clamped)?.let { return@withContext it }
 
         val fetched = runCatching {

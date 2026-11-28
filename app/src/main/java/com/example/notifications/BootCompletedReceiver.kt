@@ -15,7 +15,8 @@ class BootCompletedReceiver : BroadcastReceiver() {
         val action = intent.action ?: return
         if (action == Intent.ACTION_BOOT_COMPLETED ||
             action == Intent.ACTION_TIME_CHANGED ||
-            action == Intent.ACTION_TIMEZONE_CHANGED
+            action == Intent.ACTION_TIMEZONE_CHANGED ||
+            action == Intent.ACTION_DATE_CHANGED
         ) {
             val app = context.applicationContext as? MihrabApplication ?: return
             val pending = goAsync()

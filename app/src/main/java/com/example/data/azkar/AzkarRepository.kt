@@ -81,6 +81,12 @@ class AzkarRepository(private val dhikrDao: DhikrDao) {
 
         val dailyVerses = listOf(
             DailyVerseItem(
+                arabicText = "وَاسْتَعِينُوا بِالصَّبْرِ وَالصَّلَاةِ",
+                translationEn = "And seek help through patience and prayer",
+                referenceEn = "Al-Baqarah 2:45",
+                referenceAr = "البقرة ٤٥"
+            ),
+            DailyVerseItem(
                 arabicText = "فَٱذْكُرُونِىٓ أَذْكُرْكُمْ وَٱشْكُرُوا۟ لِى وَلَا تَكْفُرُونِ",
                 translationEn = "So remember Me; I will remember you. And be grateful to Me and do not deny Me.",
                 referenceEn = "Al-Baqarah 2:152",

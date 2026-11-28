@@ -70,7 +70,9 @@ data class UserPreferences(
     val lastReadPage: Int = 1,
     val selectedReciterId: String = "ar.husary",
     val tasbeehDailyGoal: Int = 100,
-    val quranWidgetVerseIndex: Int = 0
+    val quranWidgetVerseIndex: Int = 0,
+    val monthWidgetShowBottomDate: Boolean = true,
+    val weekdayWidgetShowBottomDate: Boolean = true
 ) {
     fun isPrayerNotificationEnabled(type: PrayerType): Boolean = when (type) {
         PrayerType.FAJR -> notifyFajr
@@ -127,6 +129,8 @@ class UserPreferencesDataStore(private val context: Context) {
         val RECITER = stringPreferencesKey("reciter")
         val TASBEEH_GOAL = intPreferencesKey("tasbeeh_goal")
         val QURAN_WIDGET_VERSE_INDEX = intPreferencesKey("quran_widget_verse_index")
+        val MONTH_WIDGET_SHOW_BOTTOM_DATE = booleanPreferencesKey("month_widget_show_bottom_date")
+        val WEEKDAY_WIDGET_SHOW_BOTTOM_DATE = booleanPreferencesKey("weekday_widget_show_bottom_date")
     }
 
     val preferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { p ->
@@ -174,7 +178,9 @@ class UserPreferencesDataStore(private val context: Context) {
             lastReadPage = (p[Keys.LAST_PAGE] ?: 1).coerceIn(1, 604),
             selectedReciterId = p[Keys.RECITER] ?: "ar.husary",
             tasbeehDailyGoal = p[Keys.TASBEEH_GOAL] ?: 100,
-            quranWidgetVerseIndex = p[Keys.QURAN_WIDGET_VERSE_INDEX] ?: 0
+            quranWidgetVerseIndex = p[Keys.QURAN_WIDGET_VERSE_INDEX] ?: 0,
+            monthWidgetShowBottomDate = p[Keys.MONTH_WIDGET_SHOW_BOTTOM_DATE] ?: true,
+            weekdayWidgetShowBottomDate = p[Keys.WEEKDAY_WIDGET_SHOW_BOTTOM_DATE] ?: true
         )
     }
 
@@ -207,6 +213,26 @@ class UserPreferencesDataStore(private val context: Context) {
             prefs[Keys.QURAN_WIDGET_VERSE_INDEX] = nextIdx
         }
         return nextIdx
+    }
+
+    suspend fun toggleMonthWidgetBottomDate(): Boolean {
+        var nextValue = true
+        edit { prefs ->
+            val current = prefs[Keys.MONTH_WIDGET_SHOW_BOTTOM_DATE] ?: true
+            nextValue = !current
+            prefs[Keys.MONTH_WIDGET_SHOW_BOTTOM_DATE] = nextValue
+        }
+        return nextValue
+    }
+
+    suspend fun toggleWeekdayWidgetBottomDate(): Boolean {
+        var nextValue = true
+        edit { prefs ->
+            val current = prefs[Keys.WEEKDAY_WIDGET_SHOW_BOTTOM_DATE] ?: true
+            nextValue = !current
+            prefs[Keys.WEEKDAY_WIDGET_SHOW_BOTTOM_DATE] = nextValue
+        }
+        return nextValue
     }
 
     suspend fun updateLastRead(surah: Int, ayah: Int) = edit {

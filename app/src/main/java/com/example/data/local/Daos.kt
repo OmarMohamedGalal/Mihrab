@@ -30,6 +30,9 @@ interface QuranDao {
     @Query("SELECT COUNT(*) FROM quran_verses")
     fun observeTotalVerseCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM quran_verses")
+    suspend fun getTotalVerseCount(): Int
+
     @Query(
         """
         SELECT * FROM quran_verses

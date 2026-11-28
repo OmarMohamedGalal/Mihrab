@@ -76,8 +76,8 @@ import com.example.core.i18n.LocalStrings
 import com.example.data.quran.QuranMetadata
 import com.example.data.quran.QuranScriptFormatter
 import com.example.ui.theme.AmiriFamily
-import com.example.ui.theme.AmiriQuranFamily
 import com.example.ui.theme.EmeraldAligned
+import com.example.ui.theme.KfgqpcHafsFamily
 import com.example.ui.theme.NotoSansArabicFamily
 import com.example.ui.theme.RobotoMonoFamily
 
@@ -438,7 +438,7 @@ private fun QuranBrowserView(
                                 )
                                 Text(
                                     text = cleanSnippet,
-                                    fontFamily = AmiriQuranFamily,
+                                    fontFamily = KfgqpcHafsFamily,
                                     fontSize = 21.sp,
                                     textAlign = TextAlign.End,
                                     modifier = Modifier.fillMaxWidth()
@@ -617,7 +617,7 @@ private fun QuranBrowserView(
                                             Text(
                                                 text = if (isArabic) "سورة ${surah.nameAr}" else surah.nameEn,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontFamily = if (isArabic) AmiriQuranFamily else MaterialTheme.typography.titleMedium.fontFamily,
+                                                fontFamily = if (isArabic) KfgqpcHafsFamily else MaterialTheme.typography.titleMedium.fontFamily,
                                                 fontSize = if (isArabic) 20.sp else 16.sp
                                             )
                                             Text(
@@ -652,7 +652,7 @@ private fun QuranBrowserView(
                                         } else {
                                             Text(
                                                 text = surah.nameAr,
-                                                fontFamily = AmiriQuranFamily,
+                                                fontFamily = KfgqpcHafsFamily,
                                                 fontSize = 21.sp,
                                                 fontWeight = FontWeight.Normal,
                                                 color = MaterialTheme.colorScheme.primary
@@ -791,7 +791,7 @@ private fun QuranBrowserView(
                                                 )
                                                 Text(
                                                     text = bm.arabicSnippet,
-                                                    fontFamily = AmiriQuranFamily,
+                                                    fontFamily = KfgqpcHafsFamily,
                                                     fontSize = 18.sp,
                                                     maxLines = 2,
                                                     overflow = TextOverflow.Ellipsis

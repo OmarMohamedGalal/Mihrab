@@ -21,7 +21,8 @@ class QuranRepository(
     private val quranDao: QuranDao,
     private val bookmarkDao: BookmarkDao,
     private val remoteApi: QuranRemoteApi,
-    private val quranComLineRepository: QuranComLineRepository? = null
+    private val quranComLineRepository: QuranComLineRepository? = null,
+    private val bundledLoader: BundledMedinaMushafLoader? = null
 ) {
     fun observeSurahVerses(surahNumber: Int): Flow<List<QuranVerseEntity>> =
         quranDao.observeSurahVerses(surahNumber)
@@ -42,6 +43,16 @@ class QuranRepository(
         bookmarkDao.observeIsBookmarked(surah, ayah)
 
     suspend fun ensureStarterDataSeeded() = withContext(Dispatchers.IO) {
+        val currentCount = quranDao.getTotalVerseCount()
+        if (currentCount < 6236) {
+            val bundledVerses = bundledLoader?.getAllVerses().orEmpty()
+            if (bundledVerses.isNotEmpty()) {
+                bundledVerses.chunked(800).forEach { batch ->
+                    quranDao.insertVerses(batch)
+                }
+                return@withContext
+            }
+        }
         if (quranDao.getSurahVerses(1).isEmpty() ||
             quranDao.getPageVerses(2).isEmpty() ||
             quranDao.getPageVerses(3).isEmpty()
@@ -57,6 +68,11 @@ class QuranRepository(
             if (existing.size >= expectedCount) {
                 return@withContext Result.success(existing)
             }
+            val bundled = bundledLoader?.getSurahVerses(surahNumber).orEmpty()
+            if (bundled.size >= expectedCount) {
+                quranDao.insertVerses(bundled)
+                return@withContext Result.success(bundled)
+            }
             fetchSurahFromRemote(surahNumber).recoverCatching { err ->
                 if (existing.isNotEmpty()) existing else throw err
             }
@@ -64,15 +80,21 @@ class QuranRepository(
 
     suspend fun fetchAndCachePageIfMissing(pageNumber: Int): Result<List<QuranVerseEntity>> =
         withContext(Dispatchers.IO) {
-            val existing = quranDao.getPageVerses(pageNumber)
-            val surahsOnPage = QuranMetadata.surahsOnPage(pageNumber)
+            val clamped = pageNumber.coerceIn(1, QuranMetadata.TOTAL_MUSHAF_PAGES)
+            val existing = quranDao.getPageVerses(clamped)
+            val surahsOnPage = QuranMetadata.surahsOnPage(clamped)
             val allSurahsFullyCached = surahsOnPage.isNotEmpty() && surahsOnPage.all { surah ->
                 quranDao.getSurahVerses(surah.number).size >= surah.ayahCount
             }
             if (existing.isNotEmpty() && allSurahsFullyCached) {
                 return@withContext Result.success(existing)
             }
-            fetchPageFromRemote(pageNumber).recoverCatching { err ->
+            val bundledPage = bundledLoader?.getPageVerses(clamped).orEmpty()
+            if (bundledPage.isNotEmpty()) {
+                quranDao.insertVerses(bundledPage)
+                return@withContext Result.success(bundledPage)
+            }
+            fetchPageFromRemote(clamped).recoverCatching { err ->
                 if (existing.isNotEmpty()) existing else throw err
             }
         }
@@ -182,7 +204,10 @@ class QuranRepository(
     }
 
     suspend fun searchVerses(query: String): List<QuranVerseEntity> = withContext(Dispatchers.IO) {
-        if (query.isBlank()) emptyList() else quranDao.searchVerses(query.trim())
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return@withContext emptyList()
+        val bundledHits = bundledLoader?.searchVerses(trimmed).orEmpty()
+        if (bundledHits.isNotEmpty()) bundledHits else quranDao.searchVerses(trimmed)
     }
 
     suspend fun setBookmark(verse: QuranVerseEntity, bookmarked: Boolean) = withContext(Dispatchers.IO) {
@@ -212,6 +237,7 @@ class QuranRepository(
             val hizb = QuranScriptFormatter.hizbForPage(clamped)
             val cachedSnippet = quranDao.getPageVerses(clamped).firstOrNull()?.arabicText
                 ?.takeIf { it.isNotBlank() }
+                ?: bundledLoader?.getPageVerses(clamped)?.firstOrNull()?.arabicText?.takeIf { it.isNotBlank() }
                 ?: "صفحة ${QuranScriptFormatter.toArabicIndic(clamped)} • الجزء ${QuranScriptFormatter.toArabicIndic(juz)} • الحزب ${QuranScriptFormatter.toArabicIndic(hizb)}"
             bookmarkDao.upsert(
                 BookmarkEntity(

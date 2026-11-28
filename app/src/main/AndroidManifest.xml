@@ -53,6 +53,7 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
             </intent-filter>
         </receiver>
 
@@ -126,6 +127,42 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/prayer_timetable_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.CalligraphyMonthWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_transparent_month_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/transparent_month_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.TransparentQuranVerseWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_transparent_quran_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/transparent_quran_verse_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.CalligraphyWeekdayWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_transparent_weekday_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/transparent_weekday_widget_info" />
         </receiver>
     </application>
 

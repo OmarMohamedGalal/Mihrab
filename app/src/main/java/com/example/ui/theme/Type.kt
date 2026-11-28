@@ -59,6 +59,11 @@ val AmiriQuranFamily = FontFamily(
     Font(R.font.amiri_quran, FontWeight.Bold)
 )
 
+val KfgqpcHafsFamily = FontFamily(
+    Font(R.font.kfgqpc_uthmanic_hafs, FontWeight.Normal),
+    Font(R.font.kfgqpc_uthmanic_hafs, FontWeight.Bold)
+)
+
 val ScheherazadeNewFamily = FontFamily(
     Font(R.font.scheherazade_new, FontWeight.Normal),
     Font(R.font.scheherazade_new, FontWeight.Bold)

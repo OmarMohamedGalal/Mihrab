@@ -3,4 +3,10 @@
     <string name="widget_description">مواقيت الصلاة القادمة والعد التنازلي والتاريخ الهجري</string>
     <string name="widget_day_card_label">بطاقة اليوم</string>
     <string name="widget_day_card_desc">اسم اليوم مع التاريخ</string>
+    <string name="widget_transparent_month_label">الشهر والتاريخ (شفاف)</string>
+    <string name="widget_transparent_month_desc">ويدجت شفاف بالخط العربي للشهر ورقم اليوم والتاريخ الهجري</string>
+    <string name="widget_transparent_quran_label">آية قرآنية (شفاف)</string>
+    <string name="widget_transparent_quran_desc">ويدجت شفاف لآية قرآنية مع الترجمة — اضغط لتغيير الآية</string>
+    <string name="widget_transparent_weekday_label">اليوم والتاريخ (شفاف)</string>
+    <string name="widget_transparent_weekday_desc">ويدجت شفاف بالخط العربي لاسم اليوم والتاريخ الميلادي والهجري</string>
 </resources>

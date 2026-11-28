@@ -6,6 +6,7 @@ import com.example.data.azkar.AzkarRepository
 import com.example.data.local.AppDatabase
 import com.example.data.prayer.PrayerTrackerRepository
 import com.example.data.preferences.UserPreferencesDataStore
+import com.example.data.quran.BundledMedinaMushafLoader
 import com.example.data.quran.QuranComLineRepository
 import com.example.data.quran.QuranComTafsirApi
 import com.example.data.quran.QuranComV4Api
@@ -97,8 +98,12 @@ class AppContainer(context: Context) {
         UserPreferencesDataStore(appContext)
     }
 
+    val bundledMedinaMushafLoader: BundledMedinaMushafLoader by lazy {
+        BundledMedinaMushafLoader(appContext)
+    }
+
     val quranComLineRepository: QuranComLineRepository by lazy {
-        QuranComLineRepository(appContext, quranComV4Api, moshi)
+        QuranComLineRepository(appContext, quranComV4Api, moshi, bundledMedinaMushafLoader)
     }
 
     val quranTafsirRepository: QuranTafsirRepository by lazy {
@@ -110,7 +115,13 @@ class AppContainer(context: Context) {
     }
 
     val quranRepository: QuranRepository by lazy {
-        QuranRepository(database.quranDao(), database.bookmarkDao(), quranApi, quranComLineRepository)
+        QuranRepository(
+            quranDao = database.quranDao(),
+            bookmarkDao = database.bookmarkDao(),
+            remoteApi = quranApi,
+            quranComLineRepository = quranComLineRepository,
+            bundledLoader = bundledMedinaMushafLoader
+        )
     }
 
     val azkarRepository: AzkarRepository by lazy {
